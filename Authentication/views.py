@@ -22,21 +22,30 @@ class SignIn(APIView):
         data = self.request.data
         email = data['email']
         password = data['password']
+        User.objects.create(
+            firstName = "anish",
+            lastName = "U",
+            phoneNumber = 630192,
+            email = "anishu@gmail.com",
+            role = "student",
+            encryptedPassword = "password",
+            created_date = "2023-14-09",
+            blocked = False)
+        user = User.objects.filter(email=email).values()
 
-        user = User.objects.filter(email=email).values()[0]
-        user_password = user['encryptedPassword']
-        if user is not None and password == user_password:
-            print(user["id"])
-            return Response({"id": user["id"],
-                             "email": user["email"],
-                             "role": user["role"],
-                             "firstName": user["firstName"]
-                             },
-                            status=status.HTTP_200_OK
-                            )
-
+        if user is not None:
+            user = user[0]
+            user_password = user['encryptedPassword']
+            if password == user_password:
+                print(user["id"])
+                return Response({"id": user["id"],
+                                 "email": user["email"],
+                                 "role": user["role"],
+                                 "firstName": user["firstName"]
+                                 },
+                                status=status.HTTP_200_OK
+                                )
         else:
-
             return Response({"message": "Invalid Credentials. Try Again"}, status=status.HTTP_401_UNAUTHORIZED)
 
 # @method_decorator(ensure_csrf_cookie, name='dispatch')
