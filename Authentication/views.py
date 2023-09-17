@@ -22,18 +22,9 @@ class SignIn(APIView):
         data = self.request.data
         email = data['email']
         password = data['password']
-        User.objects.create(
-            firstName = "anish",
-            lastName = "U",
-            phoneNumber = 630192,
-            email = "anishu@gmail.com",
-            role = "student",
-            encryptedPassword = "password",
-            created_date = "2023-14-09",
-            blocked = False)
         user = User.objects.filter(email=email).values()
-
-        if user is not None:
+        print(user.exists())
+        if user.exists():
             user = user[0]
             user_password = user['encryptedPassword']
             if password == user_password:
