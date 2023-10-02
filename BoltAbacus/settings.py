@@ -15,7 +15,6 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -26,7 +25,6 @@ SECRET_KEY = 'django-insecure-0g1c($2c113=8r=hih*ymw^=-2yk^gzj*2ifd-rb5m$$#!#483
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -56,7 +54,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'BoltAbacus.urls'
 
- # add [os.path.join(BASE_DIR), 'build')] in DIRS
+# add [os.path.join(BASE_DIR), 'build')] in DIRS
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -75,20 +73,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'BoltAbacus.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'BoltAbacus',
+        'NAME': 'BoltAbacusDb',
         'USER': 'postgres',
         'PASSWORD': '12345678',
         'HOST': 'localhost'
     }
 }
 
+# AUTH_USER_MODEL = "Authentication.TopicDetails"
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -108,7 +106,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
@@ -119,7 +116,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -142,9 +138,14 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.BasicAuthentication'
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication'
     ]
 }
 
+# allows frontend to access the app
 CORS_ORIGIN_ALLOW_ALL = True
+# allows the frontend to get cookies
+CORS_ALLOW_CREDENTIALS = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
