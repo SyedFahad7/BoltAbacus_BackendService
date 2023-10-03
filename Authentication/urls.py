@@ -1,6 +1,3 @@
-import django.contrib.auth
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView,TokenVerifyView
-
 from . import views
 from django.urls import path, include
 

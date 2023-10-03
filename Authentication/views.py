@@ -90,23 +90,18 @@ class CurrentLevels(APIView):
 
     def get(self, request):
         # pushingData()
-        idToken = request.COOKIES.get('token')
-        if idToken is None:
-            return Response({'expired': "tokenExpired"})
-        secretKey = "BoltAbacus"
-        payload = jwt.decode(idToken, secretKey, algorithms=['HS256'])
-        print(payload)
-        userId = payload['UserId']
-        print(userId)
         try:
+            idToken = request.headers['AUTH-TOKEN']
+            if idToken is None:
+                return Response({'expired': "tokenExpired"})
+            secretKey = "BoltAbacus"
+            payload = jwt.decode(idToken, secretKey, algorithms=['HS256'])
+            userId = payload['UserId']
             userBatchDetails = Student.objects.filter(user=userId).values()[0]
-            print(userBatchDetails)
             userBatchId = userBatchDetails['batch_id']
             userBatch = Batch.objects.filter(batchId=userBatchId).values()[0]
-            print(userBatch)
             latestLevel = userBatch['latestLevelId']
             latestClass = userBatch['latestClass_id']
-            print(userBatch, userBatchDetails)
             return Response({"levelId": latestLevel, "classId": latestClass}, status=status.HTTP_200_OK)
         except Exception as e:
             Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
