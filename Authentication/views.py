@@ -36,11 +36,12 @@ class SignIn(APIView):
                 response = Response({
                     "email": user["email"],
                     "role": user["role"],
-                    "firstName": user["firstName"]
+                    "firstName": user["firstName"],
+                    "lastName": user["lastName"],
+                    "token": loginToken
                 },
                     status=status.HTTP_200_OK
                 )
-                response.set_cookie(key="token", value=loginToken)
                 return response
             else:
                 return Response({"message": "Invalid Password. Try Again"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -102,8 +103,8 @@ class CurrentLevels(APIView):
             userBatch = Batch.objects.filter(batchId=userBatchId).values()[0]
             latestLevel = userBatch['latestLevelId']
             latestLink = userBatch['latestLink']
-            #join class link
-            return Response({"levelId": latestLevel, "link": latestLink}, status=status.HTTP_200_OK)
+            latestClass = userBatch['latestClass_id']
+            return Response({"levelId": latestLevel, "latestClass": latestClass, "latestLink": latestLink}, status=status.HTTP_200_OK)
         except Exception as e:
             Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
