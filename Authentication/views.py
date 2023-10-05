@@ -14,6 +14,7 @@ class SignIn(APIView):
     permission_classes = (AllowAny,)
 
     def post(self, request):
+        # pushingData()
         data = self.request.data
         email = data['email']
         password = data['password']
@@ -89,7 +90,6 @@ class CurrentLevels(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # pushingData()
         try:
             idToken = request.headers['AUTH-TOKEN']
             if idToken is None:
@@ -101,8 +101,9 @@ class CurrentLevels(APIView):
             userBatchId = userBatchDetails['batch_id']
             userBatch = Batch.objects.filter(batchId=userBatchId).values()[0]
             latestLevel = userBatch['latestLevelId']
-            latestClass = userBatch['latestClass_id']
-            return Response({"levelId": latestLevel, "classId": latestClass}, status=status.HTTP_200_OK)
+            latestLink = userBatch['latestLink']
+            #join class link
+            return Response({"levelId": latestLevel, "link": latestLink}, status=status.HTTP_200_OK)
         except Exception as e:
             Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
