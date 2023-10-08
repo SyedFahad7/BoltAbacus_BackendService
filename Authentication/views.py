@@ -1,13 +1,14 @@
-from rest_framework.permissions import AllowAny, IsAuthenticated
+import datetime
+import jwt
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-import jwt, datetime
 
-from Authentication.models import UserDetails, Student, Batch, Curriculum
-
-
-# method_decorator(csrf_protect, name='dispatch')
+from Authentication.models import (UserDetails, Student,
+                                   Batch, Curriculum,
+                                   TopicDetails, QuizQuestions,
+                                   Progress)
 
 
 class SignIn(APIView):
@@ -21,7 +22,7 @@ class SignIn(APIView):
         user = UserDetails.objects.filter(email=email).values()
         print(user.exists())
         if user.exists():
-            user = user[0]
+            user = user.first()
             user_password = user['encryptedPassword']
             if password == user_password:
                 print(user["userId"])
@@ -87,6 +88,16 @@ def pushingData():
     # print(batch, userStudentEntry, user, curriculum)
 
 
+def IdExtraction(token):
+    try:
+        secretKey = "BoltAbacus"
+        payload = jwt.decode(token, secretKey, algorithms=['HS256'])
+        userId = payload['UserId']
+        return userId
+    except Exception as e:
+        return e
+
+
 class CurrentLevels(APIView):
     permission_classes = [AllowAny]
 
@@ -98,16 +109,266 @@ class CurrentLevels(APIView):
             secretKey = "BoltAbacus"
             payload = jwt.decode(idToken, secretKey, algorithms=['HS256'])
             userId = payload['UserId']
-            userBatchDetails = Student.objects.filter(user=userId).values()[0]
+            userBatchDetails = Student.objects.filter(user=userId).values().first()
             userBatchId = userBatchDetails['batch_id']
-            userBatch = Batch.objects.filter(batchId=userBatchId).values()[0]
+            userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
             latestLevel = userBatch['latestLevelId']
             latestLink = userBatch['latestLink']
             latestClass = userBatch['latestClass_id']
-            return Response({"levelId": latestLevel, "latestClass": latestClass, "latestLink": latestLink}, status=status.HTTP_200_OK)
+            return Response({"levelId": latestLevel, "latestClass": latestClass, "latestLink": latestLink},
+                            status=status.HTTP_200_OK)
         except Exception as e:
             Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+def pushTopicsData():
+    TopicDetails.objects.all().delete()
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=1,
+        topicId=1
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=1,
+        topicId=2
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=1,
+        topicId=3
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=2,
+        topicId=1
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=2,
+        topicId=2
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=2,
+        topicId=3
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=3,
+        topicId=1
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=3,
+        topicId=2
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=3,
+        topicId=3
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=3,
+        topicId=4
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=2,
+        classId=1,
+        topicId=1
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=2,
+        classId=1,
+        topicId=2
+    ).save()
+
+
+def pushProgressData(user):
+    curriculum = Curriculum.objects.create(
+        quizId=4,
+        levelId=1,
+        classId=3,
+        topicId=1,
+        quizType='Classwork',
+        quizName='1stClasswork')
+    Progress.objects.create(user=user, quiz=curriculum, score=100, time='1:00', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=5,
+        levelId=1,
+        classId=3,
+        topicId=1,
+        quizType='HomeWork',
+        quizName='131HomeWork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=90, time='0:40', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=6,
+        levelId=1,
+        classId=3,
+        topicId=2,
+        quizType='Classwork',
+        quizName='132Classwork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=7,
+        levelId=1,
+        classId=3,
+        topicId=2,
+        quizType='HomeWork',
+        quizName='132HomeWork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=8,
+        levelId=1,
+        classId=3,
+        topicId=3,
+        quizType='Classwork',
+        quizName='133Classwork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=9,
+        levelId=1,
+        classId=3,
+        topicId=3,
+        quizType='HomeWork',
+        quizName='133HomeWork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=10,
+        levelId=1,
+        classId=3,
+        topicId=4,
+        quizType='Classwork',
+        quizName='134Classwork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+
+    curriculum = Curriculum.objects.create(
+        quizId=11,
+        levelId=1,
+        classId=3,
+        topicId=4,
+        quizType='HomeWork',
+        quizName='134HomeWork')
+
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+
+    print("EntryComplete!!!!!!!!!!!!!!!")
+
+
+class TopicsData(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        pushTopicsData()
+        print(request)
+        data = request.data
+        requestLevelId = data['levelId']
+        topicDetails = TopicDetails.objects.filter(levelId=requestLevelId)
+        topicDetailsDictionary = {}
+        for topic in topicDetails:
+            try:
+                topicDetailsDictionary[topic.classId].append(topic.topicId)
+            except:
+                topicDetailsDictionary[topic.classId] = [topic.topicId]
+        response = Response()
+        classData = []
+        for i in topicDetailsDictionary:
+            classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
+            # data()
+
+        requestUserId = data['userId']
+        userBatchDetails = Student.objects.filter(user=requestUserId).values().first()
+        userBatchId = userBatchDetails['batch_id']
+        userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
+        latestLevel = userBatch['latestLevelId']
+        latestClass = userBatch['latestClass_id']
+
+        progressData = []
+        if latestLevel != requestLevelId:
+            progressData.append({"isLatestLevel": False})
+        else:
+            progressData.append({"isLatestLevel": True})
+            curriculumDetails = Curriculum.objects.filter(levelId=latestLevel, classId=latestClass)
+            for quiz in curriculumDetails:
+                quizId = quiz.quizId
+                progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
+                progressData.append(
+                    {'topicId': quiz.topicId, 'QuizType': quiz.quizType, 'isPass': progress['quizPass']})
+        classData.append(progressData)
+        response.data = classData
+        return response
+
+#
+# class QuizQuestionsData(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request):
+#         requestLevelId = request['levelId']
+#         requestClassId = request['classId']
+#         requestQuizType = request['quizType']
+#         if requestQuizType == 'test':
+#             curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+#                                                           classId=requestClassId,
+#                                                           quizType=requestQuizType)
+#         else:
+#             requestTopicId = request['topicId']
+#             curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+#                                                           classId=requestClassId,
+#                                                           topicId=requestTopicId,
+#                                                           quizType=requestQuizType)
+#         requestQuizId = curriculumDetails.first()['quizId']
+#         questions = QuizQuestions.objects.filter(quizId=requestQuizId)
+#         quizQuestionsSerializer = QuizQuestionsSerializer(questions, many=True)
+#         return Response(quizQuestionsSerializer.data)
+#
+#
+# class ProgressUpdate(APIView):
+#     def post(self, request):
+#         try:
+#             idToken = request.headers['AUTH-TOKEN']
+#             if idToken is None:
+#                 return Response({'expired': "tokenExpired"})
+#             requestUserId = IdExtraction(idToken)
+#             user = UserDetails.objects.filter(userId=requestUserId)
+#             requestQuizId = request['quizId']
+#             curriculum = Curriculum.objects.filter(quizId=requestQuizId)
+#             requestScore = request['score']
+#             requestQuizTime = request['time']
+#             requestResult = request['result']
+#             progress = Progress.objects.filter(user=user, quiz=curriculum).first()
+#             progress.score = requestScore
+#             progress.time = requestQuizTime
+#             progress.quizPass = requestResult
+#             progress.save()
+#
+#         except Exception as e:
+#             Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         return Response({'message': 'UpdateSuccessful'})
+#
 # @method_decorator(ensure_csrf_cookie, name='dispatch')
 # class GetCSRFToken(APIView):
 #     permission_classes = (permissions.AllowAny)
