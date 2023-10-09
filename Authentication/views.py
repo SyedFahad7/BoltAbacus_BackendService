@@ -300,7 +300,11 @@ class TopicsData(APIView):
             classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
             # data()
 
-        requestUserId = data['userId']
+        requestUserToken = request.headers['AUTH-TOKEN']
+        try:
+            requestUserId = IdExtraction(requestUserToken)
+        except Exception as e:
+            return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
         userBatchDetails = Student.objects.filter(user=requestUserId).values().first()
         userBatchId = userBatchDetails['batch_id']
         userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
