@@ -283,8 +283,6 @@ class TopicsData(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        pushTopicsData()
-        print(request)
         data = request.data
         requestLevelId = data['levelId']
         topicDetails = TopicDetails.objects.filter(levelId=requestLevelId)
@@ -298,7 +296,6 @@ class TopicsData(APIView):
         classData = []
         for i in topicDetailsDictionary:
             classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
-            # data()
 
         requestUserToken = request.headers['AUTH-TOKEN']
         try:
