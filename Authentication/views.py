@@ -282,7 +282,7 @@ def pushProgressData(user):
 class TopicsData(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request):
+    def post(self, request):
         pushTopicsData()
         print(request)
         data = request.data
@@ -312,20 +312,22 @@ class TopicsData(APIView):
         latestClass = userBatch['latestClass_id']
 
         progressData = []
-        if latestLevel != requestLevelId:
-            progressData.append({"isLatestLevel": False})
-        else:
-            progressData.append({"isLatestLevel": True})
+        if requestLevelId <= 0 or requestLevelId>10:
+            return Response({"error": "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
+        elif latestLevel > requestLevelId:
+            isLatestLevel = False
+        elif latestLevel == requestLevelId:
+            isLatestLevel = True
             curriculumDetails = Curriculum.objects.filter(levelId=latestLevel, classId=latestClass)
             for quiz in curriculumDetails:
                 quizId = quiz.quizId
                 progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
                 progressData.append(
                     {'topicId': quiz.topicId, 'QuizType': quiz.quizType, 'isPass': progress['quizPass']})
-        classData.append(progressData)
-        response.data = classData
+        else:
+            return Response({"error": "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
+        response.data = {"schema": classData, "isLatestLevel": isLatestLevel, "progress": progressData}
         return response
-
 #
 # class QuizQuestionsData(APIView):
 #     permission_classes = [AllowAny]
