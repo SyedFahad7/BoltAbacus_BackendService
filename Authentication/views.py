@@ -184,6 +184,18 @@ def pushTopicsData():
     ).save()
 
     TopicDetails.objects.create(
+        levelId=1,
+        classId=4,
+        topicId=1
+    ).save()
+
+    TopicDetails.objects.create(
+        levelId=1,
+        classId=4,
+        topicId=2
+    ).save()
+
+    TopicDetails.objects.create(
         levelId=2,
         classId=1,
         topicId=1
@@ -323,7 +335,7 @@ class TopicsData(APIView):
                     {'topicId': quiz.topicId, 'QuizType': quiz.quizType, 'isPass': progress['quizPass']})
         else:
             return Response({"error": "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
-        response.data = {"schema": classData, "isLatestLevel": isLatestLevel, "progress": progressData}
+        response.data = {"schema": classData, "isLatestLevel": isLatestLevel, "progress": progressData, "latestClass": latestClass}
         return response
 #
 # class QuizQuestionsData(APIView):
