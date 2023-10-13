@@ -1,5 +1,6 @@
 import datetime
 import jwt
+import json
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -321,7 +322,7 @@ class TopicsData(APIView):
         latestClass = userBatch['latestClass_id']
 
         progressData = []
-        if requestLevelId <= 0 or requestLevelId>10:
+        if requestLevelId <= 0 or requestLevelId > 10:
             return Response({"error": "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
         elif latestLevel > requestLevelId:
             isLatestLevel = False
@@ -335,32 +336,97 @@ class TopicsData(APIView):
                     {'topicId': quiz.topicId, 'QuizType': quiz.quizType, 'isPass': progress['quizPass']})
         else:
             return Response({"error": "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
-        response.data = {"schema": classData, "isLatestLevel": isLatestLevel, "progress": progressData, "latestClass": latestClass}
+        response.data = {"schema": classData, "isLatestLevel": isLatestLevel, "progress": progressData,
+                         "latestClass": latestClass}
         return response
-#
-# class QuizQuestionsData(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def get(self, request):
-#         requestLevelId = request['levelId']
-#         requestClassId = request['classId']
-#         requestQuizType = request['quizType']
-#         if requestQuizType == 'test':
-#             curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
-#                                                           classId=requestClassId,
-#                                                           quizType=requestQuizType)
-#         else:
-#             requestTopicId = request['topicId']
-#             curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
-#                                                           classId=requestClassId,
-#                                                           topicId=requestTopicId,
-#                                                           quizType=requestQuizType)
-#         requestQuizId = curriculumDetails.first()['quizId']
-#         questions = QuizQuestions.objects.filter(quizId=requestQuizId)
-#         quizQuestionsSerializer = QuizQuestionsSerializer(questions, many=True)
-#         return Response(quizQuestionsSerializer.data)
-#
-#
+
+
+def pushQuestions():
+    QuizQuestions.objects.all().delete()
+    curriculum = Curriculum.objects.filter(quizId=4).first()
+    QuizQuestions.objects.create(
+        questionId=1,
+        question="{\"operator\":\"+\",\"numbers\":[1,2,3,4,5,6]}",
+        correctAnswer="21",
+        quiz=curriculum
+    )
+
+    QuizQuestions.objects.create(
+        questionId=2,
+        question="{\"operator\":\"+\",\"numbers\":[21,-10,-3,140,53,1644]}",
+        correctAnswer="21",
+        quiz=curriculum
+    )
+
+    QuizQuestions.objects.create(
+        questionId=3,
+        question="{\"operator\":\"/\",\"numbers\":[121,11]}",
+        correctAnswer="21",
+        quiz=curriculum
+    )
+
+    QuizQuestions.objects.create(
+        questionId=4,
+        question="{\"operator\":\"*\",\"numbers\":[121,11]}",
+        correctAnswer="21",
+        quiz=curriculum
+    )
+
+
+class QuizQuestionsData(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        pushQuestions()
+        requestUserToken = request.headers['AUTH-TOKEN']
+        try:
+            requestUserId = IdExtraction(requestUserToken)
+        except Exception as e:
+            return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+        userBatchDetails = Student.objects.filter(user=requestUserId).first()
+        userBatchId = userBatchDetails.batch_id
+        userBatch = Batch.objects.filter(batchId=userBatchId).first()
+        latestLevel = userBatch.latestLevelId
+        latestClass = userBatch.latestClass_id
+
+        data = request.data
+        requestLevelId = data['levelId']
+        requestClassId = data['classId']
+        requestQuizType = data['quizType']
+
+        if requestClassId != latestClass:
+            return Response({"error": "Level not accessible"}, status=status.HTTP_403_FORBIDDEN)
+
+        if requestLevelId != latestLevel:
+            return Response({"error": "Level not accessible"}, status=status.HTTP_403_FORBIDDEN)
+
+        if requestQuizType == 'Test':
+            curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                          classId=requestClassId,
+                                                          quizType=requestQuizType).first()
+        else:
+            requestTopicId = data['topicId']
+            curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                          classId=requestClassId,
+                                                          topicId=requestTopicId,
+                                                          quizType=requestQuizType).first()
+        requestQuizId = curriculumDetails.quizId
+        questions = QuizQuestions.objects.filter(quiz_id=requestQuizId)
+        questionList = []
+        for question in questions:
+            questionFormat = json.loads(question.question)
+            questionList.append({"questionId": question.questionId, "question": questionFormat})
+        response = Response()
+        response.data = {"questions": questionList, "time": 10}
+
+        return response
+
+
+# class QuizCorrection(APIView):
+#     def post(self, request):
+#         data = request.data
+#         answers = data['answers']
+
 # class ProgressUpdate(APIView):
 #     def post(self, request):
 #         try:

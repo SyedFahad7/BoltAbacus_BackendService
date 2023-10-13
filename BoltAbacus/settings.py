@@ -79,12 +79,12 @@ WSGI_APPLICATION = 'BoltAbacus.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'boltabacus',
-        # 'NAME': 'BoltAbacusDb',
+        # 'NAME': 'boltabacus',
+        'NAME': 'BoltAbacusDb',
         'USER': 'postgres',
         'PASSWORD': '12345678',
-        # 'HOST': 'localhost',
-        'HOST': 'boltabacus.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
+        'HOST': 'localhost',
+        # 'HOST': 'boltabacus.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
         'PORT': '5432'
     }
 }
