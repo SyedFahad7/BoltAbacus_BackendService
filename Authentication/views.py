@@ -422,33 +422,67 @@ class QuizQuestionsData(APIView):
         return response
 
 
+def ConvertToString(questionJson):
+    numbers = questionJson['numbers']
+    operator = questionJson['operator']
+    if operator == '*' or operator == '/':
+        return str(numbers[0]) + operator + str(numbers[1])
+    else:
+        question = str(numbers[0])
+        for i in range(1, len(numbers)):
+            if numbers[i] > 0:
+                question += (operator + str(numbers[i]))
+            else:
+                question += str(numbers[i])
+
+        return question
+
+
 # class QuizCorrection(APIView):
+#     permission_classes = [AllowAny]
+#
 #     def post(self, request):
 #         data = request.data
 #         answers = data['answers']
-
-# class ProgressUpdate(APIView):
-#     def post(self, request):
+#         verdictList = []
+#         print(data)
+#         numberOfCorrectAnswers = 0
+#         numberOfAnswers = len(answers)
+#         isPass = False
+#         for answer in answers:
+#             questionId = answer['questionId']
+#             questionObject = QuizQuestions.objects.filter(questionId=questionId).first()
+#             correctAnswer = questionObject.correctAnswer
+#             verdict = (float(correctAnswer) == answer['answer'])
+#             if verdict:
+#                 numberOfCorrectAnswers+=1
+#             question = json.loads(questionObject.question)
+#             questionString = ConvertToString(question)
+#             print(questionString)
+#             verdictList.append({"question": questionString, "verdict": verdict, "answer": answer['answer']})
+#         print(verdictList)
+#         if (numberOfCorrectAnswers / numberOfAnswers) >= 0.75:
+#             isPass = True
 #         try:
 #             idToken = request.headers['AUTH-TOKEN']
 #             if idToken is None:
 #                 return Response({'expired': "tokenExpired"})
 #             requestUserId = IdExtraction(idToken)
-#             user = UserDetails.objects.filter(userId=requestUserId)
-#             requestQuizId = request['quizId']
-#             curriculum = Curriculum.objects.filter(quizId=requestQuizId)
-#             requestScore = request['score']
-#             requestQuizTime = request['time']
-#             requestResult = request['result']
+#             user = UserDetails.objects.filter(userId=requestUserId).first()
+#             requestQuizId = data['quizId']
+#             curriculum = Curriculum.objects.filter(quizId=requestQuizId).first()
+#             requestScore = numberOfCorrectAnswers
+#             requestQuizTime = str(data['time'])
+#             requestResult = isPass
 #             progress = Progress.objects.filter(user=user, quiz=curriculum).first()
 #             progress.score = requestScore
 #             progress.time = requestQuizTime
-#             progress.quizPass = requestResult
+#             progress.quizPass = False
 #             progress.save()
-#
+#             return Response({"results": verdictList, "pass": isPass})
 #         except Exception as e:
-#             Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-#         return Response({'message': 'UpdateSuccessful'})
+#             return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 #
 # @method_decorator(ensure_csrf_cookie, name='dispatch')
 # class GetCSRFToken(APIView):

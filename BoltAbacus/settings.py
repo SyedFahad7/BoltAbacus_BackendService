@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 import os
 from pathlib import Path
+from corsheaders.defaults import default_headers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -79,12 +80,12 @@ WSGI_APPLICATION = 'BoltAbacus.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        # 'NAME': 'boltabacus',
-        'NAME': 'BoltAbacusDb',
+        'NAME': 'boltabacus',
+        # 'NAME': 'BoltAbacusDb',
         'USER': 'postgres',
         'PASSWORD': '12345678',
-        'HOST': 'localhost',
-        # 'HOST': 'boltabacus.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
+        # 'HOST': 'localhost',
+        'HOST': 'boltabacus.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
         'PORT': '5432'
     }
 }
@@ -151,4 +152,9 @@ CORS_ORIGIN_ALLOW_ALL = True
 # allows the frontend to get cookies
 CORS_ALLOW_CREDENTIALS = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "AUTH-TOKEN",
+)
 
