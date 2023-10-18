@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+</style>
+</head>
+<body>
+
+<h2>Report of Level {{ levelId }}  Class {{ classId }}  topic {{ topicId }}  {{ quizType }}</h2>
+{% if result %}
+    <p>Result: Pass</p>
+{% else %}
+    <p>Result: Fail</p>
+{% endif%}
+<table style="width:100%">
+  <tr>
+    <th>Question</th>
+    <th>Your answer</th>
+    <th>Verdict</th>
+  </tr>
+    {% for answer in verdictList %}
+    	<tr>
+            <td>{{ answer.question }}</td>
+            <td>{{ answer.answer }}</td>
+            {% if answer.verdict %}
+                <td>Correct</td>
+            {% else %}
+                <td>Wrong</td>
+            {% endif %}
+        </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>
+

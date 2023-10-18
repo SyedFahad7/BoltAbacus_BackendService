@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-0g1c($2c113=8r=hih*ymw^=-2yk^gzj*2ifd-rb5m$$#!#483
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*'] 
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -54,12 +54,13 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'BoltAbacus.urls'
+PROJECT_PATH = os.path.realpath(os.path.dirname(__file__))
 
 # add [os.path.join(BASE_DIR), 'build')] in DIRS
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.realpath(os.path.dirname(__file__)), 'templates/'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -158,3 +159,9 @@ CORS_ALLOW_HEADERS = (
     "AUTH-TOKEN",
 )
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_HOST_PASSWORD = 'cheusnzxiwzydgbp'
+EMAIL_HOST_USER = 'boltabacus.dev@gmail.com'
+EMAIL_USE_TLS = True
