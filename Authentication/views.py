@@ -399,10 +399,10 @@ class QuizQuestionsData(APIView):
             requestQuizType = data['quizType']
 
             if requestClassId > latestClass:
-                return Response({"error": "Level not accessible"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"error": "Quiz not accessible"}, status=status.HTTP_403_FORBIDDEN)
 
             if requestLevelId > latestLevel:
-                return Response({"error": "Level not accessible"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"error": "Quiz not accessible"}, status=status.HTTP_403_FORBIDDEN)
 
             if requestQuizType == 'Test':
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
@@ -421,7 +421,7 @@ class QuizQuestionsData(APIView):
                 questionFormat = json.loads(question.question)
                 questionList.append({"questionId": question.questionId, "question": questionFormat})
             response = Response()
-            response.data = {"questions": questionList, "time": 10}
+            response.data = {"questions": questionList, "time": 10, "quizId": requestQuizId}
 
             return response
         except Exception as e:
@@ -502,12 +502,13 @@ class QuizCorrection(APIView):
 
                 curriculum = Curriculum.objects.filter(quizId=requestQuizId).first()
                 requestScore = numberOfCorrectAnswers
-                requestQuizTime = str(data['time'])
+                requestQuizTime = data['time']
 
                 progress = Progress.objects.filter(user=user, quiz=curriculum).first()
                 progress.score = requestScore
                 progress.time = requestQuizTime
                 progress.quizPass = False
+                progress.percentage = (numberOfCorrectAnswers / numberOfAnswers) * 100
                 progress.save()
 
                 sendEmail(verdictList,
@@ -521,6 +522,33 @@ class QuizCorrection(APIView):
                 return Response({"results": verdictList, "pass": isPass})
             except Exception as e:
                 return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ReportDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                requestUserId = IdExtraction(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            data = request.data
+            requestLevelId = data['levelId']
+            requestClassId = data['classId']
+
+            classQuizDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=requestClassId)
+            topicProgress = []
+            for quizDetails in classQuizDetails:
+                quizId = quizDetails.quizId
+                progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
+                topicProgress.append({"topicId": quizDetails.topicId,
+                                      "quizType": quizDetails.quizType,
+                                      "percentage": progress['percentage']})
+            return Response(topicProgress)
         except Exception as e:
             return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

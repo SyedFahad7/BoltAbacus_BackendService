@@ -7,6 +7,6 @@ urlpatterns = [
     path('classes/', views.TopicsData.as_view()),
     path('quiz/', views.QuizQuestionsData.as_view()),
     path('quizCorrection/', views.QuizCorrection.as_view()),
-
+    path('report/', views.ReportDetails.as_view())
     # path('/token', views.GetCSRFToken.as_view() , name='authentication')
 ]

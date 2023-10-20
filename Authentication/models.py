@@ -41,9 +41,10 @@ class QuizQuestions(models.Model):
 class Progress(models.Model):
     quiz = models.ForeignKey(Curriculum, null=True, on_delete=models.CASCADE)
     user = models.ForeignKey(UserDetails, null=True, on_delete=models.CASCADE)
-    score = models.IntegerField()
-    time = models.CharField()
-    quizPass = models.BooleanField()
+    score = models.IntegerField(default=0)
+    time = models.IntegerField()
+    quizPass = models.BooleanField(default=False)
+    percentage = models.FloatField(default=0)
 
 
 class Batch(models.Model):
