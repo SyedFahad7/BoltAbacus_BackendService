@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.core.mail import EmailMessage, get_connection
+from django.core.mail import EmailMessage
 from django.template import loader
 
 from Authentication.models import (UserDetails, Student,
@@ -51,44 +51,6 @@ class SignIn(APIView):
             return Response({"message": "Invalid Credentials. Try Again"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-def pushingData():
-    user = UserDetails.objects.create(
-        firstName='anish',
-        lastName='U',
-        phoneNumber='9635404926',
-        email='anishu@gmail.com',
-        role='student',
-        encryptedPassword='password1',
-        created_date='2023-09-30',
-        blocked=0
-    )
-    user.save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=3,
-        levelId=5,
-        classId=3,
-        topicId=2,
-        quizType='Classwork',
-        quizName='1stClasswork', )
-    # curriculum.save()
-    batch = Batch.objects.create(
-        batchId=2,
-        timeDay='Wednesday',
-        timeSchedule='10:00AM',
-        numberOfStudents=2,
-        active=1,
-        batchName='FirstBatch',
-        latestLevelId=1,
-        latestClass=curriculum,
-        latestLink='www.google.com')
-
-    batch.save()
-    userStudentEntry = Student.objects.create(user=user, batch=batch)
-    userStudentEntry.save()
-    # print(batch, userStudentEntry, user, curriculum)
-
-
 def IdExtraction(token):
     try:
         secretKey = "BoltAbacus"
@@ -115,7 +77,7 @@ class CurrentLevels(APIView):
             userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
             latestLevel = userBatch['latestLevelId']
             latestLink = userBatch['latestLink']
-            latestClass = userBatch['latestClass_id']
+            latestClass = userBatch['latestClassId']
             return Response({"levelId": latestLevel, "latestClass": latestClass, "latestLink": latestLink},
                             status=status.HTTP_200_OK)
         except Exception as e:
@@ -209,7 +171,35 @@ def pushTopicsData():
     ).save()
 
 
-def pushProgressData(user):
+
+class data(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        pushProgressData()
+        pushTopicsData()
+        pushQuestions()
+        return Response("Message")
+
+def pushProgressData():
+    UserDetails.objects.all().delete()
+    user = UserDetails.objects.create(
+        userId=1,
+        firstName='anish',
+        lastName='U',
+        phoneNumber='9635404926',
+        email='anishu@gmail.com',
+        role='student',
+        encryptedPassword='password1',
+        created_date='2023-09-30',
+        blocked=0
+    )
+    user.save()
+    user = UserDetails.objects.filter(firstName='anish').first()
+    Student.objects.all().delete()
+    Batch.objects.all().delete()
+    Progress.objects.all().delete()
+    Curriculum.objects.all().delete()
     curriculum = Curriculum.objects.create(
         quizId=4,
         levelId=1,
@@ -217,17 +207,37 @@ def pushProgressData(user):
         topicId=1,
         quizType='Classwork',
         quizName='1stClasswork')
-    Progress.objects.create(user=user, quiz=curriculum, score=100, time='1:00', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=100, time='100', quizPass=True).save()
+    curriculum = Curriculum.objects.create(
+        quizId=3,
+        levelId=1,
+        classId=3,
+        topicId=0,
+        quizType='Test',
+        quizName='130Test')
+    Progress.objects.create(user=user, quiz=curriculum, score=100, time='100', quizPass=True).save()
+
+    batch = Batch.objects.create(
+        batchId=2,
+        timeDay='Wednesday',
+        timeSchedule='10:00AM',
+        numberOfStudents=2,
+        active=1,
+        batchName='FirstBatch',
+        latestLevelId=1,
+        latestClassId=3,
+        latestLink='www.google.com')
+    userStudentEntry = Student.objects.create(user=user, batch=batch)
 
     curriculum = Curriculum.objects.create(
         quizId=5,
         levelId=1,
         classId=3,
         topicId=1,
-        quizType='HomeWork',
-        quizName='131HomeWork')
+        quizType='Homework',
+        quizName='131Homework')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=90, time='0:40', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=90, time='40', quizPass=True).save()
 
     curriculum = Curriculum.objects.create(
         quizId=6,
@@ -237,17 +247,17 @@ def pushProgressData(user):
         quizType='Classwork',
         quizName='132Classwork')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
 
     curriculum = Curriculum.objects.create(
         quizId=7,
         levelId=1,
         classId=3,
         topicId=2,
-        quizType='HomeWork',
-        quizName='132HomeWork')
+        quizType='Homework',
+        quizName='132Homework')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
 
     curriculum = Curriculum.objects.create(
         quizId=8,
@@ -257,17 +267,17 @@ def pushProgressData(user):
         quizType='Classwork',
         quizName='133Classwork')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
 
     curriculum = Curriculum.objects.create(
         quizId=9,
         levelId=1,
         classId=3,
         topicId=3,
-        quizType='HomeWork',
-        quizName='133HomeWork')
+        quizType='Homework',
+        quizName='133Homework')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
 
     curriculum = Curriculum.objects.create(
         quizId=10,
@@ -277,17 +287,17 @@ def pushProgressData(user):
         quizType='Classwork',
         quizName='134Classwork')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
 
     curriculum = Curriculum.objects.create(
         quizId=11,
         levelId=1,
         classId=3,
         topicId=4,
-        quizType='HomeWork',
-        quizName='134HomeWork')
+        quizType='Homework',
+        quizName='134Homework')
 
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='1:20', quizPass=True).save()
+    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
 
     print("EntryComplete!!!!!!!!!!!!!!!")
 
@@ -320,7 +330,7 @@ class TopicsData(APIView):
             userBatchId = userBatchDetails['batch_id']
             userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
             latestLevel = userBatch['latestLevelId']
-            latestClass = userBatch['latestClass_id']
+            latestClass = userBatch['latestClassId']
 
             progressData = []
             if requestLevelId <= 0 or requestLevelId > 10:
@@ -391,7 +401,7 @@ class QuizQuestionsData(APIView):
             userBatchId = userBatchDetails.batch_id
             userBatch = Batch.objects.filter(batchId=userBatchId).first()
             latestLevel = userBatch.latestLevelId
-            latestClass = userBatch.latestClass_id
+            latestClass = userBatch.latestClassId
 
             data = request.data
             requestLevelId = data['levelId']
@@ -488,10 +498,10 @@ class QuizCorrection(APIView):
                 question = json.loads(questionObject.question)
                 questionString = ConvertToString(question)
                 verdictList.append({"question": questionString, "verdict": verdict, "answer": answer['answer']})
-
+            print(numberOfCorrectAnswers, numberOfAnswers)
             if (numberOfCorrectAnswers / numberOfAnswers) >= 0.75:
                 isPass = True
-
+            print(isPass)
             try:
                 idToken = request.headers['AUTH-TOKEN']
                 if idToken is None:
@@ -507,7 +517,7 @@ class QuizCorrection(APIView):
                 progress = Progress.objects.filter(user=user, quiz=curriculum).first()
                 progress.score = requestScore
                 progress.time = requestQuizTime
-                progress.quizPass = False
+                progress.quizPass = isPass
                 progress.percentage = (numberOfCorrectAnswers / numberOfAnswers) * 100
                 progress.save()
 
@@ -519,7 +529,7 @@ class QuizCorrection(APIView):
                           isPass,
                           user.email)
 
-                return Response({"results": verdictList, "pass": isPass})
+                return Response({"results": verdictList, "pass": isPass, "time": requestQuizTime})
             except Exception as e:
                 return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
@@ -541,14 +551,26 @@ class ReportDetails(APIView):
             requestClassId = data['classId']
 
             classQuizDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=requestClassId)
-            topicProgress = []
+            topicProgress = {}
             for quizDetails in classQuizDetails:
                 quizId = quizDetails.quizId
                 progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
-                topicProgress.append({"topicId": quizDetails.topicId,
-                                      "quizType": quizDetails.quizType,
-                                      "percentage": progress['percentage']})
-            return Response(topicProgress)
+                try:
+                    topicProgress[quizDetails.topicId].update({quizDetails.quizType: progress['percentage']})
+                except:
+                    topicProgress[quizDetails.topicId] = {quizDetails.quizType: progress['percentage']}
+            progressOfTopics = []
+            print(topicProgress)
+            for topicResult in topicProgress:
+                print(topicResult)
+                result = topicProgress[topicResult]
+                print(result)
+                if topicResult != 0:
+                    progressOfTopics.append({"topicId": topicResult,
+                                             "Classwork": result['Classwork'],
+                                             "Homework": result['Homework']})
+            test = {"Test": topicProgress[0]['Test']}
+            return Response({"quiz": progressOfTopics, "test": test})
         except Exception as e:
             return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

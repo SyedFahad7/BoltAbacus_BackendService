@@ -33,14 +33,14 @@ class Curriculum(models.Model):
 
 class QuizQuestions(models.Model):
     questionId = models.IntegerField(primary_key=True)
-    quiz = models.ForeignKey(Curriculum, null=True, on_delete=models.CASCADE)
+    quiz = models.ForeignKey(Curriculum, to_field='quizId', null=True, on_delete=models.CASCADE)
     question = models.CharField()
     correctAnswer = models.CharField()
 
 
 class Progress(models.Model):
-    quiz = models.ForeignKey(Curriculum, null=True, on_delete=models.CASCADE)
-    user = models.ForeignKey(UserDetails, null=True, on_delete=models.CASCADE)
+    quiz = models.ForeignKey(Curriculum, to_field='quizId', null=True, on_delete=models.CASCADE)
+    user = models.ForeignKey(UserDetails,to_field='userId', null=True, on_delete=models.CASCADE)
     score = models.IntegerField(default=0)
     time = models.IntegerField()
     quizPass = models.BooleanField(default=False)
@@ -55,16 +55,16 @@ class Batch(models.Model):
     active = models.BooleanField()
     batchName = models.CharField()
     latestLevelId = models.IntegerField()
-    latestClass = models.OneToOneField(Curriculum, null=True, on_delete=models.CASCADE)
+    latestClassId = models.IntegerField()
     latestLink = models.CharField()
 
 
 class Student(models.Model):
-    user = models.OneToOneField(UserDetails, on_delete=models.CASCADE)
-    batch = models.ForeignKey(Batch, on_delete=models.DO_NOTHING)
+    user = models.OneToOneField(UserDetails, to_field='userId', on_delete=models.CASCADE)
+    batch = models.ForeignKey(Batch,to_field='batchId', on_delete=models.DO_NOTHING)
 
 
 class Teacher(models.Model):
-    user = models.OneToOneField(UserDetails, on_delete=models.CASCADE)
-    batch = models.ManyToManyField(Batch)
+    user = models.OneToOneField(UserDetails, to_field='userId', on_delete=models.CASCADE)
+    batchId = models.IntegerField()
 # Create your models here.
