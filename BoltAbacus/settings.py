@@ -85,7 +85,7 @@ DATABASES = {
         # 'NAME': 'BoltAbacus',
         'USER': 'postgres',
         'PASSWORD': '12345678',
-        # 'HOST': 'localhost',
+        'HOST': 'localhost',
         'HOST': 'boltabacusdb.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
         # 'HOST': 'boltabacus.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
         'PORT': '5432'
