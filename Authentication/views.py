@@ -77,7 +77,7 @@ class CurrentLevels(APIView):
             return Response({"levelId": latestLevel, "latestClass": latestClass, "latestLink": latestLink},
                             status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class TopicsData(APIView):
@@ -122,14 +122,17 @@ class TopicsData(APIView):
                     quizId = quiz.quizId
                     progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
                     progressData.append(
-                        {'topicId': quiz.topicId, 'QuizType': quiz.quizType, 'isPass': progress['quizPass']})
+                        {'topicId': quiz.topicId,
+                         'QuizType': quiz.quizType,
+                         'isPass': progress['quizPass'],
+                         'percentage': progress['percentage']})
             else:
                 return Response({"error": "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
             response.data = {"schema": classData, "isLatestLevel": isLatestLevel, "progress": progressData,
                              "latestClass": latestClass}
             return response
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class QuizQuestionsData(APIView):
@@ -181,7 +184,7 @@ class QuizQuestionsData(APIView):
 
             return response
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class QuizCorrection(APIView):
@@ -240,9 +243,9 @@ class QuizCorrection(APIView):
 
                 return Response({"results": verdictList, "pass": isPass, "time": requestQuizTime})
             except Exception as e:
-                return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ReportDetails(APIView):
@@ -278,17 +281,32 @@ class ReportDetails(APIView):
             test = {"Test": topicProgress[0]['Test']}
             return Response({"quiz": progressOfTopics, "test": test})
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class data(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        pushProgressData()
-        pushTopicsData()
-        pushQuestions()
-        return Response("Message")
+
+        # pushProgressData()
+        # pushTopicsData()
+        # pushQuestions()
+        # addAdminUser()
+        return Response("message")
+
+def addAdminUser():
+    adminUser = UserDetails.objects.create(
+        firstName = "Bolt",
+        lastName = "Abacus",
+        phoneNumber = "+919032024912",
+        email = "boltabacus.dev@gmail.com",
+        role = "Admin",
+        encryptedPassword = "password1",
+        created_date = datetime.datetime.now(),
+        blocked = False
+    )
+    adminUser.save()
 
 
 def sendEmail(verdictList, levelId, classId, topicId, quizType, result, emailId):
@@ -620,7 +638,7 @@ class getAllQuestions(APIView):
 
             return response
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class EditQuestion(APIView):
@@ -637,9 +655,9 @@ class EditQuestion(APIView):
             questionFromDb.question = questionFormat
             questionFromDb.correctAnswer = correctAnswer
             questionFromDb.save()
-            return Response({"Message": "Success"}, status=status.HTTP_200_OK)
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetQuestion(APIView):
@@ -655,7 +673,7 @@ class GetQuestion(APIView):
                              "question": questionFormat,
                              "correctAnswer": int(questionFromDb.correctAnswer)}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AddQuestion(APIView):
@@ -694,9 +712,9 @@ class AddQuestion(APIView):
                                                            quiz_id=quizId,
                                                            correctAnswer=correctAnswer)
             questionDetails.save()
-            return Response({"Message": "Success"}, status=status.HTTP_200_OK)
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetAllBatches(APIView):
@@ -722,7 +740,7 @@ class AddBatch(APIView):
             teacherUserId = data['userId']
             user = UserDetails.objects.filter(userId=teacherUserId).first()
             if user.role != "Teacher":
-                return Response({"Error Message": "Given User is not a Teacher"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"message": "Given User is not a Teacher"}, status=status.HTTP_403_FORBIDDEN)
             else:
                 newBatch = Batch.objects.create(
                     timeDay=timeDay,
@@ -740,9 +758,9 @@ class AddBatch(APIView):
                 )
                 teacher.save()
                 newBatch.save()
-                return Response({"Message": "Success"}, status=status.HTTP_200_OK)
+                return Response({"message": "Success"}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetBatch(APIView):
@@ -764,7 +782,7 @@ class GetBatch(APIView):
                 "latestClassId": batchDetails.latestClassId
             }, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class EditBatchDetails(APIView):
@@ -790,9 +808,9 @@ class EditBatchDetails(APIView):
             batchDetails.latestLevelId = latestLevelId
             batchDetails.latestClassId = latestClassId
             batchDetails.save()
-            return Response({"Message": "Success"}, status=status.HTTP_200_OK)
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DeleteBatch(APIView):
@@ -804,13 +822,13 @@ class DeleteBatch(APIView):
             batchId = data['batchId']
             batchStudents = Student.objects.filter(batch_id=batchId).first()
             if batchStudents:
-                return Response({"Message": "Cannot Delete the batch as it has students in it"},
+                return Response({"message": "Cannot Delete the batch as it has students in it"},
                                 status=status.HTTP_403_FORBIDDEN)
             batchDetails = Batch.objects.filter(batchId=batchId).first()
             batchDetails.delete()
-            return Response({"Message": "Success"}, status=status.HTTP_200_OK)
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AddTeacher(APIView):
@@ -823,6 +841,8 @@ class AddTeacher(APIView):
             lastName = data['lastName']
             phoneNumber = data['phoneNumber']
             email = data['email']
+            if UserDetails.objects.filter(email=email).first() != None:
+                return Response({"message": "User with this email already Exists"}, status=status.HTTP_400_BAD_REQUEST)
             user = UserDetails.objects.create(
                 firstName=firstName,
                 lastName=lastName,
@@ -842,10 +862,10 @@ class AddTeacher(APIView):
             )
             email.send()
 
-            return Response({"Message": "Success"},
+            return Response({"message": "Success"},
                             status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)},
+            return Response({"message": repr(e)},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -863,7 +883,7 @@ class GetTeachers(APIView):
                                  "lastName": teacher.lastName})
             return Response({"teachers": teachers}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # class AssignBatch(APIView):
@@ -879,13 +899,13 @@ class GetTeachers(APIView):
 #                     batchId = data['batchId']
 #                     return assignUserToBatch(Teacher, batchId, teacherId, "Teacher")
 #                 else:
-#                     return Response({"Error Message": "Given user is not a teacher"},
+#                     return Response({"message": "Given user is not a teacher"},
 #                                     status=status.HTTP_403_FORBIDDEN)
 #             else:
-#                 return Response({"Error Message": "Given user doesn't exist"},
+#                 return Response({"message": "Given user doesn't exist"},
 #                                 status=status.HTTP_403_FORBIDDEN)
 #         except Exception as e:
-#             return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # class AssignStudentToBatch(APIView):
@@ -901,16 +921,16 @@ class GetTeachers(APIView):
 #                     batchId = data['batchId']
 #                     return assignUserToBatch(Student, batchId, studentId, "Student")
 #                 else:
-#                     return Response({"Error Message": "Given user is not a Student"},
+#                     return Response({"message": "Given user is not a Student"},
 #                                     status=status.HTTP_403_FORBIDDEN)
 #
 #             else:
-#                 return Response({"Error Message": "Given user doesn't exist"},
+#                 return Response({"message": "Given user doesn't exist"},
 #                                 status=status.HTTP_403_FORBIDDEN)
 #
 #             pass
 #         except Exception as e:
-#             return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AddStudent(APIView):
@@ -936,7 +956,7 @@ class GetStudents(APIView):
                                  "lastName": student.lastName})
             return Response({"students": students}, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def getStudentIds(batchId):
@@ -963,6 +983,9 @@ def createUser(request, dbObject, role):
         lastName = data['lastName']
         phoneNumber = data['phoneNumber']
         email = data['email']
+        if UserDetails.objects.filter(email=email).first() != None:
+            return Response({"message": "User with this email already Exists"}, status=status.HTTP_400_BAD_REQUEST)
+
         password = generatePassword()
 
         batchId = data['batchId']
@@ -1011,13 +1034,13 @@ def createUser(request, dbObject, role):
                 [email, 'boltabacus.dev@gmail.com']
             )
             email.send()
-            return Response({"Message": "Success"},
+            return Response({"message": "Success"},
                             status=status.HTTP_200_OK)
         else:
-            return Response({"Error Message": "Given batch Id is invalid"},
+            return Response({"message": "Given batch Id is invalid"},
                             status=status.HTTP_403_FORBIDDEN)
     except Exception as e:
-        return Response({"Error Message": repr(e)},
+        return Response({"message": repr(e)},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1039,13 +1062,13 @@ def createUser(request, dbObject, role):
 #             print("murali")
 #             if role == "Student":
 #                 addProgressIfNeeded(previousbatchId, batchId, userId)
-#             return Response({"Message": "Success"},
+#             return Response({"message": "Success"},
 #                             status=status.HTTP_200_OK)
 #         except Exception as e:
-#             return Response({"Error Message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 #     else:
 #
-#         return Response({"Error Message": "Given batch Id is invalid"},
+#         return Response({"message": "Given batch Id is invalid"},
 #                         status=status.HTTP_403_FORBIDDEN)
 #
 #

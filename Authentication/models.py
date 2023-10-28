@@ -65,6 +65,6 @@ class Student(models.Model):
 
 
 class Teacher(models.Model):
-    user = models.OneToOneField(UserDetails, to_field='userId', on_delete=models.CASCADE)
+    user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE)
     batchId = models.IntegerField()
 # Create your models here.
