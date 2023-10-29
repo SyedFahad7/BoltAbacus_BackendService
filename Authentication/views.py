@@ -3,7 +3,6 @@ import random
 
 import jwt
 import json
-import pandas as pd
 import re
 from rest_framework import status
 from rest_framework.permissions import AllowAny
