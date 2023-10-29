@@ -3,7 +3,6 @@ import random
 
 import jwt
 import json
-import re
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -98,7 +97,7 @@ class TopicsData(APIView):
             classData = []
             for i in topicDetailsDictionary:
                 classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
-
+            classData = (sorted(classData, key=lambda x: x['classId']))
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
@@ -286,23 +285,23 @@ class data(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-
         # pushProgressData()
         # pushTopicsData()
         # pushQuestions()
         # addAdminUser()
         return Response("message")
 
+
 def addAdminUser():
     adminUser = UserDetails.objects.create(
-        firstName = "Bolt",
-        lastName = "Abacus",
-        phoneNumber = "+919032024912",
-        email = "boltabacus.dev@gmail.com",
-        role = "Admin",
-        encryptedPassword = "password1",
-        created_date = datetime.datetime.now(),
-        blocked = False
+        firstName="Bolt",
+        lastName="Abacus",
+        phoneNumber="+919032024912",
+        email="boltabacus.dev@gmail.com",
+        role="Admin",
+        encryptedPassword="password1",
+        created_date=datetime.datetime.now(),
+        blocked=False
     )
     adminUser.save()
 
@@ -711,7 +710,7 @@ class GetAllBatches(APIView):
         batchIds = []
         for batchId in batchIdDetails:
             batchIds.append({"batchId": batchId['batchId'], "batchName": batchId['batchName']})
-        return Response({"batches":batchIds})
+        return Response({"batches": batchIds})
 
 
 class AddBatch(APIView):
@@ -819,6 +818,7 @@ class DeleteBatch(APIView):
 
 class AddTeacher(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request):
         try:
             data = request.data
@@ -852,7 +852,7 @@ class AddTeacher(APIView):
                             status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": repr(e)},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetTeachers(APIView):
@@ -947,6 +947,7 @@ class GetStudents(APIView):
 
 class GetTopicsData(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request):
         try:
             data = request.data
@@ -958,13 +959,15 @@ class GetTopicsData(APIView):
                     topicDetailsDictionary[topic.classId].append(topic.topicId)
                 except:
                     topicDetailsDictionary[topic.classId] = [topic.topicId]
+            print(topicDetailsDictionary)
             classData = []
             for i in topicDetailsDictionary:
                 classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
+            classData = (sorted(classData, key=lambda x: x['classId']))
             return Response({"schema": classData}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": repr(e)},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def getStudentIds(batchId):
@@ -1108,7 +1111,7 @@ def encryptPassword(password):
 
 
 def generatePassword():
-    n = random.randint(10,15)
+    n = random.randint(10, 15)
     characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789"
 
     password = ""
