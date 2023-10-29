@@ -3,7 +3,8 @@ import random
 
 import jwt
 import json
-
+import pandas as pd
+import re
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -210,10 +211,8 @@ class QuizCorrection(APIView):
                 question = json.loads(questionObject.question)
                 questionString = ConvertToString(question)
                 verdictList.append({"question": questionString, "verdict": verdict, "answer": answer['answer']})
-            print(numberOfCorrectAnswers, numberOfAnswers)
             if (numberOfCorrectAnswers / numberOfAnswers) >= 0.75:
                 isPass = True
-            print(isPass)
             try:
                 idToken = request.headers['AUTH-TOKEN']
                 if idToken is None:
@@ -608,24 +607,19 @@ class getAllQuestions(APIView):
             requestLevelId = data['levelId']
             requestClassId = data['classId']
             requestQuizType = data['quizType']
+            requestTopicId = data['topicId']
+
             if requestQuizType == 'Test':
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
                                                               quizType=requestQuizType).first()
             else:
-                requestTopicId = data['topicId']
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
                                                               topicId=requestTopicId,
                                                               quizType=requestQuizType).first()
             if curriculumDetails is None:
-                curriculumDetails = Curriculum.objects.create(
-                    levelId=requestLevelId,
-                    classId=requestClassId,
-                    topicId=requestTopicId,
-                    quizType=requestQuizType,
-                    quizName=str(requestLevelId) + str(requestClassId) + str(requestTopicId) + requestQuizType
-                )
+                return Response({"message": "Quiz doesn't exist"}, status=status.HTTP_403_FORBIDDEN)
             quizId = curriculumDetails.quizId
             questions = QuizQuestions.objects.filter(quiz_id=quizId)
             questionList = []
@@ -687,25 +681,18 @@ class AddQuestion(APIView):
             requestLevelId = data['levelId']
             requestClassId = data['classId']
             requestQuizType = data['quizType']
-            requestTopicId = 0
+            requestTopicId = data['topicId']
             if requestQuizType == 'Test':
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
                                                               quizType=requestQuizType).first()
             else:
-                requestTopicId = data['topicId']
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
                                                               topicId=requestTopicId,
                                                               quizType=requestQuizType).first()
             if curriculumDetails is None:
-                curriculumDetails = Curriculum.objects.create(
-                    levelId=requestLevelId,
-                    classId=requestClassId,
-                    topicId=requestTopicId,
-                    quizType=requestQuizType,
-                    quizName=str(requestLevelId) + str(requestClassId) + str(requestTopicId) + requestQuizType
-                )
+                return Response({"message": "Quiz doesn't exist"}, status=status.HTTP_403_FORBIDDEN)
             quizId = curriculumDetails.quizId
             questionString = json.dumps(questionJson)
             questionDetails = QuizQuestions.objects.create(question=questionString,
@@ -959,6 +946,23 @@ class GetStudents(APIView):
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetTopicsData(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        data = request.data
+        requestLevelId = data['levelId']
+        topicDetails = TopicDetails.objects.filter(levelId=requestLevelId)
+        topicDetailsDictionary = {}
+        for topic in topicDetails:
+            try:
+                topicDetailsDictionary[topic.classId].append(topic.topicId)
+            except:
+                topicDetailsDictionary[topic.classId] = [topic.topicId]
+        classData = []
+        for i in topicDetailsDictionary:
+            classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
+        return Response({"schema": classData}, status=status.HTTP_200_OK)
+
 def getStudentIds(batchId):
     studentIdDetails = Student.objects.filter(batch_id=batchId).values("user_id")
     studentIds = []
@@ -1051,7 +1055,6 @@ def createUser(request, dbObject, role):
 #             dbObjectInstance = dbObject.objects.filter(
 #                 user_id=userId
 #             ).first()
-#             print(dbObjectInstance.batch_id, role)
 #             if role == "Teacher":
 #                 previousbatchId = dbObjectInstance.batchId
 #                 dbObjectInstance.batchId = batchId
@@ -1059,7 +1062,6 @@ def createUser(request, dbObject, role):
 #                 previousbatchId = dbObjectInstance.batch_id
 #                 dbObjectInstance.batch_id = batchId
 #             dbObjectInstance.save()
-#             print("murali")
 #             if role == "Student":
 #                 addProgressIfNeeded(previousbatchId, batchId, userId)
 #             return Response({"message": "Success"},

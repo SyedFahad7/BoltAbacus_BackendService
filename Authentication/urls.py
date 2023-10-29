@@ -26,6 +26,7 @@ urlpatterns = [
     # # path('assignBatch/', views.AssignBatch.as_view()),
 
     path('addStudent/', views.AddStudent.as_view()),
+    path('getTopicsData/', views.GetTopicsData.as_view())
     # path('getStudents/', views.GetStudents.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),
 
