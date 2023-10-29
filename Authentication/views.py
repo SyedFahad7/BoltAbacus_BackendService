@@ -258,7 +258,13 @@ class ReportDetails(APIView):
             data = request.data
             requestLevelId = data['levelId']
             requestClassId = data['classId']
-
+            userBatchDetails = Student.objects.filter(user=requestUserId).values().first()
+            userBatchId = userBatchDetails['batch_id']
+            userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
+            latestLevel = userBatch['latestLevelId']
+            latestClass = userBatch['latestClassId']
+            if requestLevelId > latestLevel or (requestClassId > latestClass and requestLevelId == latestLevel):
+                return Response({"message": "Report not accessible."}, status=status.HTTP_403_FORBIDDEN)
             classQuizDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=requestClassId)
             topicProgress = {}
             for quizDetails in classQuizDetails:
