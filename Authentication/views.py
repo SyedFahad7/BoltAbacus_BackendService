@@ -949,19 +949,24 @@ class GetStudents(APIView):
 class GetTopicsData(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
-        data = request.data
-        requestLevelId = data['levelId']
-        topicDetails = TopicDetails.objects.filter(levelId=requestLevelId)
-        topicDetailsDictionary = {}
-        for topic in topicDetails:
-            try:
-                topicDetailsDictionary[topic.classId].append(topic.topicId)
-            except:
-                topicDetailsDictionary[topic.classId] = [topic.topicId]
-        classData = []
-        for i in topicDetailsDictionary:
-            classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
-        return Response({"schema": classData}, status=status.HTTP_200_OK)
+        try:
+            data = request.data
+            requestLevelId = data['levelId']
+            topicDetails = TopicDetails.objects.filter(levelId=requestLevelId)
+            topicDetailsDictionary = {}
+            for topic in topicDetails:
+                try:
+                    topicDetailsDictionary[topic.classId].append(topic.topicId)
+                except:
+                    topicDetailsDictionary[topic.classId] = [topic.topicId]
+            classData = []
+            for i in topicDetailsDictionary:
+                classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
+            return Response({"schema": classData}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": repr(e)},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 def getStudentIds(batchId):
     studentIdDetails = Student.objects.filter(batch_id=batchId).values("user_id")
