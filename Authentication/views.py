@@ -965,7 +965,6 @@ class GetTopicsData(APIView):
                     topicDetailsDictionary[topic.classId].append(topic.topicId)
                 except:
                     topicDetailsDictionary[topic.classId] = [topic.topicId]
-            print(topicDetailsDictionary)
             classData = []
             for i in topicDetailsDictionary:
                 classData.append({'classId': i, 'topicIds': topicDetailsDictionary[i]})
@@ -1031,18 +1030,20 @@ def createUser(request, dbObject, role):
                 latestLevel = batchDetails.latestLevelId
                 latestClass = batchDetails.latestClassId
                 for i in range(latestLevel + 1):
-                    curriculum = Curriculum.objects.filter(levelId=i)
-                    for quiz in curriculum:
-                        if (quiz.levelId < latestLevel) or (quiz.classId <= latestClass and
-                                                            quiz.levelId == latestLevel):
-                            progress = Progress.objects.create(
-                                quiz_id=quiz.quizId,
-                                user_id=user.userId
-                            )
-                            progress.save()
+                    classes = getClassIds(i)
+                    for j in classes:
+                        curriculum = Curriculum.objects.filter(levelId=i, classId=j)
+                        for quiz in curriculum:
+                            if (quiz.levelId < latestLevel) or (quiz.classId <= latestClass and
+                                                                quiz.levelId == latestLevel):
+                                progress = Progress.objects.create(
+                                    quiz_id=quiz.quizId,
+                                    user_id=user.userId
+                                )
+                                progress.save()
 
-                        else:
-                            break
+                            else:
+                                break
 
             email = EmailMessage(
                 'Account has been Created',
@@ -1126,4 +1127,70 @@ def generatePassword():
         password += random.choice(characters)
 
     return password
+
+
+# ------ Teacher related APIs ------
+
+
+class UpdateBatchLink(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            batchId = data["batchId"]
+            link = data["link"]
+            batch = Batch.objects.filter(batchId=batchId).first()
+            if batch is None:
+                return Response({"message": "Batch doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+            batch.latestLink = link
+            batch.save()
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetTeacherBatches(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                userId = IdExtraction(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({"message": "User doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                if user.role != "Teacher":
+                    return Response({"message": "User is not a Teacher"}, status=status.HTTP_403_FORBIDDEN)
+
+            teacher = Teacher.objects.filter(user_id=userId)
+            batches = {
+                "Monday": [],
+                "Tuesday": [],
+                "Wednesday": [],
+                "Thursday": [],
+                "Friday": [],
+                "Saturday": [],
+                "Sunday": [],
+            }
+            for teacherBatch in teacher:
+                batchId = teacherBatch.batchId
+                batch = Batch.objects.filter(batchId=batchId).first()
+                batches[batch.timeDay].append(
+                    {"batchId": batch.batchId, "batchName": batch.batchName, "timings": batch.timeSchedule})
+            return Response({"batches": batches})
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def getClassIds(levelId):
+    classIds=set()
+    classes = TopicDetails.objects.filter(levelId=levelId)
+    for eachClass in classes:
+        classIds.add(eachClass.classId)
+    return classIds
 # Create your views here.
