@@ -9,6 +9,7 @@ urlpatterns = [
     path('quizCorrection/', views.QuizCorrection.as_view()),
     path('report/', views.ReportDetails.as_view()),
     path('data/', views.data().as_view()),
+    path('resetPassword/', views.ResetPassword.as_view()),
 
     path('addQuestion/', views.AddQuestion.as_view()),
     path('getQuestion/', views.GetQuestion.as_view()),

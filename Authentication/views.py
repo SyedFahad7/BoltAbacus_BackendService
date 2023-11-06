@@ -45,6 +45,7 @@ class SignIn(APIView):
                     "role": user["role"],
                     "firstName": user["firstName"],
                     "lastName": user["lastName"],
+                    "phone": user["phoneNumber"],
                     "token": loginToken
                 },
                     status=status.HTTP_200_OK
@@ -298,6 +299,27 @@ class data(APIView):
         return Response("message")
 
 
+
+class ResetPassword(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                requestUserId = IdExtraction(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            data = request.data
+            password = data["password"]
+            user = UserDetails.objects.filter(userId=requestUserId).first()
+            user.encryptedPassword = password
+            user.save()
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 def addAdminUser():
     adminUser = UserDetails.objects.create(
         firstName="Bolt",
@@ -357,247 +379,6 @@ def ConvertToString(questionJson):
                 question += str(numbers[i])
 
         return question
-
-
-def pushProgressData():
-    UserDetails.objects.all().delete()
-    user = UserDetails.objects.create(
-        userId=1,
-        firstName='anish',
-        lastName='U',
-        phoneNumber='9635404926',
-        email='anishu@gmail.com',
-        role='Student',
-        encryptedPassword='password1',
-        created_date='2023-09-30',
-        blocked=0
-    )
-    user.save()
-    user = UserDetails.objects.filter(firstName='anish').first()
-    Student.objects.all().delete()
-    Batch.objects.all().delete()
-    Progress.objects.all().delete()
-    Curriculum.objects.all().delete()
-    curriculum = Curriculum.objects.create(
-        quizId=4,
-        levelId=1,
-        classId=3,
-        topicId=1,
-        quizType='Classwork',
-        quizName='1stClasswork')
-    Progress.objects.create(user=user, quiz=curriculum, score=100, time='100', quizPass=True).save()
-    curriculum = Curriculum.objects.create(
-        quizId=3,
-        levelId=1,
-        classId=3,
-        topicId=0,
-        quizType='Test',
-        quizName='130Test')
-    Progress.objects.create(user=user, quiz=curriculum, score=100, time='100', quizPass=True).save()
-
-    batch = Batch.objects.create(
-        batchId=2,
-        timeDay='Wednesday',
-        timeSchedule='10:00AM',
-        numberOfStudents=2,
-        active=1,
-        batchName='FirstBatch',
-        latestLevelId=1,
-        latestClassId=3,
-        latestLink='www.google.com')
-    userStudentEntry = Student.objects.create(user=user, batch=batch)
-
-    curriculum = Curriculum.objects.create(
-        quizId=5,
-        levelId=1,
-        classId=3,
-        topicId=1,
-        quizType='Homework',
-        quizName='131Homework')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=90, time='40', quizPass=True).save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=6,
-        levelId=1,
-        classId=3,
-        topicId=2,
-        quizType='Classwork',
-        quizName='132Classwork')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=7,
-        levelId=1,
-        classId=3,
-        topicId=2,
-        quizType='Homework',
-        quizName='132Homework')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=8,
-        levelId=1,
-        classId=3,
-        topicId=3,
-        quizType='Classwork',
-        quizName='133Classwork')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=9,
-        levelId=1,
-        classId=3,
-        topicId=3,
-        quizType='Homework',
-        quizName='133Homework')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=10,
-        levelId=1,
-        classId=3,
-        topicId=4,
-        quizType='Classwork',
-        quizName='134Classwork')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
-
-    curriculum = Curriculum.objects.create(
-        quizId=11,
-        levelId=1,
-        classId=3,
-        topicId=4,
-        quizType='Homework',
-        quizName='134Homework')
-
-    Progress.objects.create(user=user, quiz=curriculum, score=80, time='120', quizPass=True).save()
-
-    print("EntryComplete!!!!!!!!!!!!!!!")
-
-
-def pushQuestions():
-    QuizQuestions.objects.all().delete()
-    curriculum = Curriculum.objects.filter(quizId=4).first()
-    QuizQuestions.objects.create(
-        questionId=1,
-        question="{\"operator\":\"+\",\"numbers\":[1,2,3,4,5,6]}",
-        correctAnswer="21",
-        quiz=curriculum
-    )
-
-    QuizQuestions.objects.create(
-        questionId=2,
-        question="{\"operator\":\"+\",\"numbers\":[21,-10,-3,140,53,1644]}",
-        correctAnswer="21",
-        quiz=curriculum
-    )
-
-    QuizQuestions.objects.create(
-        questionId=3,
-        question="{\"operator\":\"/\",\"numbers\":[121,11]}",
-        correctAnswer="21",
-        quiz=curriculum
-    )
-
-    QuizQuestions.objects.create(
-        questionId=4,
-        question="{\"operator\":\"*\",\"numbers\":[121,11]}",
-        correctAnswer="21",
-        quiz=curriculum
-    )
-
-
-def pushTopicsData():
-    TopicDetails.objects.all().delete()
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=1,
-        topicId=1
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=1,
-        topicId=2
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=1,
-        topicId=3
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=2,
-        topicId=1
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=2,
-        topicId=2
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=2,
-        topicId=3
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=3,
-        topicId=1
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=3,
-        topicId=2
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=3,
-        topicId=3
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=3,
-        topicId=4
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=4,
-        topicId=1
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=1,
-        classId=4,
-        topicId=2
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=2,
-        classId=1,
-        topicId=1
-    ).save()
-
-    TopicDetails.objects.create(
-        levelId=2,
-        classId=1,
-        topicId=2
-    ).save()
-
 
 # -------------------- Admin Related APIs ----------------------
 
@@ -1047,7 +828,7 @@ def createUser(request, dbObject, role):
 
             email = EmailMessage(
                 'Account has been Created',
-                "An account has been created for this email id for the teacher role. The password is " + password + ". Please login and change your password",
+                "An account has been created for this email id for the student role. The password is " + password + ". Please login and change your password",
                 'boltabacus.dev@gmail.com',
                 [email, 'boltabacus.dev@gmail.com']
             )
