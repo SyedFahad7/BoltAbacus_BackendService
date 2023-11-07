@@ -296,8 +296,9 @@ class data(APIView):
         # pushTopicsData()
         # pushQuestions()
         # addAdminUser()
-        return Response("message")
 
+        temp()
+        return Response("message")
 
 
 class ResetPassword(APIView):
@@ -379,6 +380,7 @@ def ConvertToString(questionJson):
                 question += str(numbers[i])
 
         return question
+
 
 # -------------------- Admin Related APIs ----------------------
 
@@ -968,10 +970,89 @@ class GetTeacherBatches(APIView):
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class UpdateClass(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+        requestUserToken = request.headers['AUTH-TOKEN']
+        try:
+            userId = IdExtraction(requestUserToken)
+        except Exception as e:
+            return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+        batchId = data["batchId"]
+        batch = Batch.objects.filter(batchId=batchId).first()
+        if batch is None:
+            return Response({"message": "Batch Doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+        latestLevel = batch.latestLevelId
+        latestClass = batch.latestClassId
+        teacher = Teacher.objects.filter(user_id=userId, batchId=batchId).first()
+        if teacher is None:
+            return Response({"message": "This User is not the Teacher for this batch."}, status=status.HTTP_403_FORBIDDEN)
+        nextLevel, nextClass = getNextClass(latestLevel, latestClass)
+        if nextClass == -1 or nextClass == -1:
+            return Response({"message": "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
+        if nextClass == -2 or nextClass == -2:
+            return Response({"message": "Class is out of Range"}, status=status.HTTP_403_FORBIDDEN)
+        if nextClass == -3 or nextClass == -3:
+            return Response({"message": "Level is out of Range"}, status=status.HTTP_403_FORBIDDEN)
+
+        students = Student.objects.filter(batch_id=batchId)
+        curriculum = Curriculum.objects.filter(levelId=nextLevel, classId=nextClass)
+        for student in students:
+            for quiz in curriculum:
+                if (quiz.levelId < nextLevel) or (quiz.classId <= nextClass and
+                                                  quiz.levelId == nextLevel):
+                    if not progressPresent(quiz.quizId, student.user_id):
+                        progress = Progress.objects.create(
+                            quiz_id=quiz.quizId,
+                            user_id=student.user_id
+                        )
+                        progress.save()
+
+                else:
+                    break
+        batch.latestClassId = nextClass
+        batch.latestLevelId = nextLevel
+        batch.save()
+        return Response({"message": "Success"}, status=status.HTTP_200_OK)
+
+
 def getClassIds(levelId):
-    classIds=set()
+    classIds = set()
     classes = TopicDetails.objects.filter(levelId=levelId)
     for eachClass in classes:
         classIds.add(eachClass.classId)
     return classIds
+
+
+def getNextClass(levelId, classId):
+    if classId > 12 or classId < 0:
+        return -2, -2
+    if levelId > 10 or levelId < 0:
+        return -3, -3
+
+    if classId == 12:
+        if levelId != 10:
+            return levelId + 1, 1
+        else:
+            return -1, -1
+    else:
+        return levelId, classId + 1
+
+
+def progressPresent(quizId, userId):
+    progress = Progress.objects.filter(quiz_id=quizId, user_id=userId).first()
+    if progress is None:
+        return False
+    else:
+        return True
+
+
+def temp():
+    print(UserDetails.objects.filter(userId=23).values())
+    # print(Batch.objects.all().values())
+    # print(Curriculum.objects.filter(levelId=1, classId=4).values(), "\n")
+    # print(Progress.objects.filter(user_id=2).values())
+
 # Create your views here.

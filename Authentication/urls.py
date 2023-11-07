@@ -18,7 +18,8 @@ urlpatterns = [
 
     path('addBatch/', views.AddBatch.as_view()),
     path('getAllBatches/', views.GetAllBatches.as_view()),
-    # path('getBatch/', views.GetBatch.as_view()),
+    path('getBatch/', views.GetBatch.as_view()),
+
     # path('editBatch/', views.EditBatchDetails.as_view()),
     # path('deleteBatch/', views.DeleteBatch.as_view()),
 
@@ -30,7 +31,8 @@ urlpatterns = [
     path('getTopicsData/', views.GetTopicsData.as_view()),
 
     path('getTeacherBatches/', views.GetTeacherBatches.as_view()),
-    path('updateBatchLink/', views.UpdateBatchLink.as_view())
+    path('updateBatchLink/', views.UpdateBatchLink.as_view()),
+    path('updateClass/', views.UpdateClass.as_view())
 
     # path('getStudents/', views.GetStudents.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),
