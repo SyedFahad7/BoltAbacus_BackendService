@@ -921,11 +921,20 @@ class UpdateBatchLink(APIView):
     def post(self, request):
         try:
             data = request.data
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                userId = IdExtraction(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             batchId = data["batchId"]
             link = data["link"]
             batch = Batch.objects.filter(batchId=batchId).first()
             if batch is None:
                 return Response({"message": "Batch doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+            teacher = Teacher.objects.filter(user_id=userId, batchId=batchId).first()
+            if teacher is None:
+                return Response({"message": "This User is not the Teacher for this batch."},
+                                status=status.HTTP_403_FORBIDDEN)
             batch.latestLink = link
             batch.save()
             return Response({"message": "Success"}, status=status.HTTP_200_OK)
@@ -974,48 +983,52 @@ class UpdateClass(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        data = request.data
-        requestUserToken = request.headers['AUTH-TOKEN']
         try:
-            userId = IdExtraction(requestUserToken)
+            data = request.data
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                userId = IdExtraction(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            batchId = data["batchId"]
+            batch = Batch.objects.filter(batchId=batchId).first()
+            if batch is None:
+                return Response({"message": "Batch Doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+            latestLevel = batch.latestLevelId
+            latestClass = batch.latestClassId
+            teacher = Teacher.objects.filter(user_id=userId, batchId=batchId).first()
+            if teacher is None:
+                return Response({"message": "This User is not the Teacher for this batch."}, status=status.HTTP_403_FORBIDDEN)
+            nextLevel, nextClass = getNextClass(latestLevel, latestClass)
+            if nextClass == -1 or nextClass == -1:
+                return Response({"message": "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
+            if nextClass == -2 or nextClass == -2:
+                return Response({"message": "Class is out of Range"}, status=status.HTTP_403_FORBIDDEN)
+            if nextClass == -3 or nextClass == -3:
+                return Response({"message": "Level is out of Range"}, status=status.HTTP_403_FORBIDDEN)
+
+            students = Student.objects.filter(batch_id=batchId)
+            curriculum = Curriculum.objects.filter(levelId=nextLevel, classId=nextClass)
+            for student in students:
+                for quiz in curriculum:
+                    if (quiz.levelId < nextLevel) or (quiz.classId <= nextClass and
+                                                      quiz.levelId == nextLevel):
+                        if not progressPresent(quiz.quizId, student.user_id):
+                            progress = Progress.objects.create(
+                                quiz_id=quiz.quizId,
+                                user_id=student.user_id
+                            )
+                            progress.save()
+
+                    else:
+                        break
+            batch.latestClassId = nextClass
+            batch.latestLevelId = nextLevel
+            batch.save()
+            return Response({"message": "Success", "level": nextLevel, "class": nextClass}, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
-        batchId = data["batchId"]
-        batch = Batch.objects.filter(batchId=batchId).first()
-        if batch is None:
-            return Response({"message": "Batch Doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
-        latestLevel = batch.latestLevelId
-        latestClass = batch.latestClassId
-        teacher = Teacher.objects.filter(user_id=userId, batchId=batchId).first()
-        if teacher is None:
-            return Response({"message": "This User is not the Teacher for this batch."}, status=status.HTTP_403_FORBIDDEN)
-        nextLevel, nextClass = getNextClass(latestLevel, latestClass)
-        if nextClass == -1 or nextClass == -1:
-            return Response({"message": "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
-        if nextClass == -2 or nextClass == -2:
-            return Response({"message": "Class is out of Range"}, status=status.HTTP_403_FORBIDDEN)
-        if nextClass == -3 or nextClass == -3:
-            return Response({"message": "Level is out of Range"}, status=status.HTTP_403_FORBIDDEN)
-
-        students = Student.objects.filter(batch_id=batchId)
-        curriculum = Curriculum.objects.filter(levelId=nextLevel, classId=nextClass)
-        for student in students:
-            for quiz in curriculum:
-                if (quiz.levelId < nextLevel) or (quiz.classId <= nextClass and
-                                                  quiz.levelId == nextLevel):
-                    if not progressPresent(quiz.quizId, student.user_id):
-                        progress = Progress.objects.create(
-                            quiz_id=quiz.quizId,
-                            user_id=student.user_id
-                        )
-                        progress.save()
-
-                else:
-                    break
-        batch.latestClassId = nextClass
-        batch.latestLevelId = nextLevel
-        batch.save()
-        return Response({"message": "Success"}, status=status.HTTP_200_OK)
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def getClassIds(levelId):
