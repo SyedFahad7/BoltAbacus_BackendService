@@ -11,6 +11,9 @@ table, th, td {
 <body>
 
 <h2>Report of Level {{ levelId }}  Class {{ classId }}  topic {{ topicId }}  {{ quizType }}</h2>
+<p>Score: {{ score }}</p>
+<p>Time: {{ time }}</p>
+<p>Percentage: {{ percentage }}</p>
 {% if result %}
     <p>Result: Pass</p>
 {% else %}

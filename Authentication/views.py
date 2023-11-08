@@ -26,6 +26,7 @@ class SignIn(APIView):
         # pushingData()
         data = self.request.data
         email = data['email']
+        email = email.lower()
         password = data['password']
         user = UserDetails.objects.filter(email=email).values()
         if user.exists():
@@ -223,12 +224,12 @@ class QuizCorrection(APIView):
                 curriculum = Curriculum.objects.filter(quizId=requestQuizId).first()
                 requestScore = numberOfCorrectAnswers
                 requestQuizTime = data['time']
-
+                percentage = (numberOfCorrectAnswers / numberOfAnswers) * 100
                 progress = Progress.objects.filter(user=user, quiz=curriculum).first()
                 progress.score = requestScore
                 progress.time = requestQuizTime
                 progress.quizPass = isPass
-                progress.percentage = (numberOfCorrectAnswers / numberOfAnswers) * 100
+                progress.percentage = percentage
                 progress.save()
 
                 sendEmail(verdictList,
@@ -237,7 +238,10 @@ class QuizCorrection(APIView):
                           curriculum.topicId,
                           curriculum.quizType,
                           isPass,
-                          user.email)
+                          user.email,
+                          percentage,
+                          secondsToMinutes(requestQuizTime),
+                          requestScore)
 
                 return Response({"results": verdictList, "pass": isPass, "time": requestQuizTime})
             except Exception as e:
@@ -335,14 +339,23 @@ def addAdminUser():
     adminUser.save()
 
 
-def sendEmail(verdictList, levelId, classId, topicId, quizType, result, emailId):
+def secondsToMinutes(time):
+    minutes = time // 60
+    seconds = time % 60
+    return str(minutes) + " minutes and " + str(seconds) + " seconds"
+
+
+def sendEmail(verdictList, levelId, classId, topicId, quizType, result, emailId, percentage, time, score):
     content = {
         'levelId': levelId,
         'classId': classId,
         'topicId': topicId,
         'quizType': quizType,
         'verdictList': verdictList,
-        'result': result
+        'result': result,
+        'time': time,
+        'percentage': percentage,
+        'score': score
     }
     template = loader.get_template('EmailTemplate.html').render(content)
     email = EmailMessage(
@@ -616,7 +629,8 @@ class AddTeacher(APIView):
             lastName = data['lastName']
             phoneNumber = data['phoneNumber']
             email = data['email']
-            if UserDetails.objects.filter(email=email).first() != None:
+            email = email.lower()
+            if UserDetails.objects.filter(email=email).first() is not None:
                 return Response({"message": "User with this email already Exists"}, status=status.HTTP_400_BAD_REQUEST)
             user = UserDetails.objects.create(
                 firstName=firstName,
@@ -781,9 +795,10 @@ def createUser(request, dbObject, role):
         firstName = data['firstName']
         lastName = data['lastName']
         phoneNumber = data['phoneNumber']
-        email = data['email']
-        if UserDetails.objects.filter(email=email).first() != None:
-            return Response({"message": "User with this email already Exists"}, status=status.HTTP_400_BAD_REQUEST)
+        emailId = data['email']
+        emailId = emailId.lower()
+        if UserDetails.objects.filter(email=emailId).first() != None:
+            return Response({"message": "User with this emailId already Exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         password = generatePassword()
 
@@ -794,7 +809,7 @@ def createUser(request, dbObject, role):
                 firstName=firstName,
                 lastName=lastName,
                 phoneNumber=phoneNumber,
-                email=email,
+                email=emailId,
                 role=role,
                 encryptedPassword=encryptPassword(password),
                 created_date=datetime.datetime.now(),
@@ -830,9 +845,9 @@ def createUser(request, dbObject, role):
 
             email = EmailMessage(
                 'Account has been Created',
-                "An account has been created for this email id for the student role. The password is " + password + ". Please login and change your password",
+                "An account has been created for this emailId id for the student role. The password is " + password + ". Please login and change your password",
                 'boltabacus.dev@gmail.com',
-                [email, 'boltabacus.dev@gmail.com']
+                [emailId, 'boltabacus.dev@gmail.com']
             )
             email.send()
             return Response({"message": "Success"},
@@ -998,7 +1013,8 @@ class UpdateClass(APIView):
             latestClass = batch.latestClassId
             teacher = Teacher.objects.filter(user_id=userId, batchId=batchId).first()
             if teacher is None:
-                return Response({"message": "This User is not the Teacher for this batch."}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"message": "This User is not the Teacher for this batch."},
+                                status=status.HTTP_403_FORBIDDEN)
             nextLevel, nextClass = getNextClass(latestLevel, latestClass)
             if nextClass == -1 or nextClass == -1:
                 return Response({"message": "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
@@ -1027,6 +1043,54 @@ class UpdateClass(APIView):
             batch.save()
             return Response({"message": "Success", "level": nextLevel, "class": nextClass}, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetClassReport(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            batchId = data["batchId"]
+            levelId = data["levelId"]
+            classId = data["classId"]
+            topicId = data["topicId"]
+            classwork = Curriculum.objects.filter(levelId=levelId,
+                                                  classId=classId,
+                                                  topicId=topicId,
+                                                  quizType="Classwork").first()
+
+            homework = Curriculum.objects.filter(levelId=levelId,
+                                                 classId=classId,
+                                                 topicId=topicId,
+                                                 quizType="Homework").first()
+
+            test = Curriculum.objects.filter(levelId=levelId,
+                                             classId=classId,
+                                             topicId=0,
+                                             quizType="Test").first()
+            classworkQuizId = classwork.quizId
+            homeworkQuizId = homework.quizId
+            testId = test.quizId
+            students = Student.objects.filter(batch_id=batchId)
+            studentReports = []
+            for student in students:
+                userId = student.user_id
+                user = UserDetails.objects.filter(userId=userId).first()
+                classworkProgress = Progress.objects.filter(quiz_id=classworkQuizId,
+                                                            user_id=userId).first()
+                homeworkProgress = Progress.objects.filter(quiz_id=homeworkQuizId,
+                                                           user_id=userId).first()
+                testProgress = Progress.objects.filter(quiz_id=testId,
+                                                       user_id=userId).first()
+                studentReports.append({"firstName": user.firstName,
+                                       "lastName": user.lastName,
+                                       "classwork": classworkProgress.percentage,
+                                       "homework": homeworkProgress.percentage,
+                                       "test": testProgress.percentage})
+            return Response({"reports": studentReports}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1063,7 +1127,10 @@ def progressPresent(quizId, userId):
 
 
 def temp():
-    print(UserDetails.objects.filter(userId=23).values())
+    print(TopicDetails.objects.filter(levelId=3).values())
+    users = UserDetails.objects.all()
+    for i in users:
+        print(i.email, i.encryptedPassword)
     # print(Batch.objects.all().values())
     # print(Curriculum.objects.filter(levelId=1, classId=4).values(), "\n")
     # print(Progress.objects.filter(user_id=2).values())
