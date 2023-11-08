@@ -1128,9 +1128,6 @@ def progressPresent(quizId, userId):
 
 def temp():
     print(TopicDetails.objects.filter(levelId=3).values())
-    users = UserDetails.objects.all()
-    for i in users:
-        print(i.email, i.encryptedPassword)
     # print(Batch.objects.all().values())
     # print(Curriculum.objects.filter(levelId=1, classId=4).values(), "\n")
     # print(Progress.objects.filter(user_id=2).values())
