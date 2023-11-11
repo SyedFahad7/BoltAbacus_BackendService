@@ -33,7 +33,8 @@ urlpatterns = [
     path('getTeacherBatches/', views.GetTeacherBatches.as_view()),
     path('updateBatchLink/', views.UpdateBatchLink.as_view()),
     path('updateClass/', views.UpdateClass.as_view()),
-    path('getClassReport/', views.GetClassReport.as_view())
+    path('getClassReport/', views.GetClassReport.as_view()),
+    path('getStudentProgress/', views.GetStudentProgress.as_view())
 
     # path('getStudents/', views.GetStudents.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),

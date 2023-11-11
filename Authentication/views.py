@@ -1057,6 +1057,19 @@ class GetClassReport(APIView):
             levelId = data["levelId"]
             classId = data["classId"]
             topicId = data["topicId"]
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                requestUserId = IdExtraction(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            teacher = UserDetails.objects.filter(userId=requestUserId).first()
+            if teacher is None:
+                return Response({"message": "User doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+            if teacher.role != "Teacher":
+                return Response({"message": "User is not a teacher."}, status=status.HTTP_403_FORBIDDEN)
+            batchTeacher = Teacher.objects.filter(user_id=requestUserId, batchId=batchId).first()
+            if batchTeacher is None:
+                return Response({"message": "Teacher is not assigned to the batch."}, status=status.HTTP_403_FORBIDDEN)
             classwork = Curriculum.objects.filter(levelId=levelId,
                                                   classId=classId,
                                                   topicId=topicId,
@@ -1085,12 +1098,87 @@ class GetClassReport(APIView):
                                                            user_id=userId).first()
                 testProgress = Progress.objects.filter(quiz_id=testId,
                                                        user_id=userId).first()
-                studentReports.append({"firstName": user.firstName,
+                if classworkProgress is None or homeworkProgress is None or testProgress is None:
+                    return Response({"message": "Report not found for student " + user.firstName + user.lastName},
+                                    status=status.HTTP_404_NOT_FOUND)
+                studentReports.append({"userId": user.userId,
+                                       "firstName": user.firstName,
                                        "lastName": user.lastName,
                                        "classwork": classworkProgress.percentage,
                                        "homework": homeworkProgress.percentage,
                                        "test": testProgress.percentage})
             return Response({"reports": studentReports}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetStudentProgress(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            userId = data["userId"]
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user.role != "Student":
+                return Response({"message": "User is not a Student"})
+            student = Student.objects.filter(user_id=userId).first()
+            batchId = student.batch_id
+            batch = Batch.objects.filter(batchId=batchId).first()
+            studentProgress = Progress.objects.filter(user_id=userId)
+            levelsProgress = {}
+            for progress in studentProgress:
+                curriculum = Curriculum.objects.filter(quizId=progress.quiz_id).first()
+                levelId = curriculum.levelId
+                classId = curriculum.classId
+                topicId = curriculum.topicId
+                counter = True
+                if classId == 1 and levelId == 1:
+                    counter = False
+                if counter:
+                    try:
+                        classProgress = levelsProgress[levelId]
+                    except:
+                        levelsProgress[levelId] = {}
+                        classProgress = levelsProgress[levelId]
+                    try:
+                        topicProgress = classProgress[classId]
+                    except:
+                        classProgress[classId] = {}
+                        topicProgress = classProgress[classId]
+                    try:
+                        topicProgress[topicId].update({curriculum.quizType: progress.percentage})
+                    except:
+                        topicProgress[topicId] = {curriculum.quizType: progress.percentage}
+            levelsProgressData = []
+            for levelId in levelsProgress:
+                levelsProgressJson = {"levelId": levelId}
+                classProgressData = []
+                classProgress = levelsProgress[levelId]
+                for classId in classProgress:
+                    classProgressJson = {"classId": classId}
+                    topicProgress = classProgress[classId]
+                    topicProgressData = []
+                    for topicId in topicProgress:
+                        if topicId != 0:
+                            result = topicProgress[topicId]
+                            topicProgressData.append({"topicId": topicId,
+                                                      "Classwork": result['Classwork'],
+                                                      "Homework": result['Homework']})
+                    classProgressJson.update({"Test": topicProgress[0]['Test']})
+                    classProgressJson.update({"topics": topicProgressData})
+                    classProgressData.append(classProgressJson)
+                levelsProgressJson.update({"classes": classProgressData})
+                levelsProgressData.append(levelsProgressJson)
+            for classes in levelsProgressData:
+                classes['classes'] = sorted(classes['classes'], key=lambda x: x['classId'])
+                for topics in classes['classes']:
+                    topics['topics'] = sorted(topics['topics'], key=lambda x: x['topicId'])
+
+            return Response({"firstName": user.firstName,
+                             "lastName": user.lastName,
+                             "batchName": batch.batchName,
+                             "levels": levelsProgressData}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
