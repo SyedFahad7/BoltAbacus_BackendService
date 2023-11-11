@@ -1057,6 +1057,8 @@ class GetClassReport(APIView):
             levelId = data["levelId"]
             classId = data["classId"]
             topicId = data["topicId"]
+            if levelId == 1 and classId == 1:
+                return Response({"message": "This class doesn't have a quiz"}, status=status.HTTP_404_NOT_FOUND)
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
@@ -1120,8 +1122,10 @@ class GetStudentProgress(APIView):
             data = request.data
             userId = data["userId"]
             user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({"message": "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
             if user.role != "Student":
-                return Response({"message": "User is not a Student"})
+                return Response({"message": "User is not a Student"}, status=status.HTTP_403_FORBIDDEN)
             student = Student.objects.filter(user_id=userId).first()
             batchId = student.batch_id
             batch = Batch.objects.filter(batchId=batchId).first()
