@@ -103,6 +103,8 @@ class TopicsData(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).values().first()
@@ -140,11 +142,12 @@ class QuizQuestionsData(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        # pushQuestions()
         try:
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
@@ -158,7 +161,7 @@ class QuizQuestionsData(APIView):
             requestClassId = data['classId']
             requestQuizType = data['quizType']
 
-            if requestClassId > latestClass:
+            if requestLevelId > latestLevel and requestClassId > latestClass:
                 return Response({"error": "Quiz not accessible"}, status=status.HTTP_403_FORBIDDEN)
 
             if requestLevelId > latestLevel:
@@ -258,6 +261,8 @@ class ReportDetails(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             data = request.data
@@ -276,17 +281,22 @@ class ReportDetails(APIView):
                 quizId = quizDetails.quizId
                 progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
                 try:
-                    topicProgress[quizDetails.topicId].update({quizDetails.quizType: progress['percentage']})
+                    topicProgress[quizDetails.topicId].update(
+                        {quizDetails.quizType: progress['percentage'], quizDetails.quizType + "Time": progress['time']})
                 except:
-                    topicProgress[quizDetails.topicId] = {quizDetails.quizType: progress['percentage']}
+                    topicProgress[quizDetails.topicId] = {quizDetails.quizType: progress['percentage'],
+                                                          quizDetails.quizType + "Time": progress['time']}
             progressOfTopics = []
             for topicResult in topicProgress:
                 result = topicProgress[topicResult]
                 if topicResult != 0:
                     progressOfTopics.append({"topicId": topicResult,
                                              "Classwork": result['Classwork'],
-                                             "Homework": result['Homework']})
-            test = {"Test": topicProgress[0]['Test']}
+                                             "ClassworkTime": result['ClassworkTime'],
+                                             "Homework": result['Homework'],
+                                             "HomeworkTime": result['HomeworkTime']
+                                             })
+            test = {"Test": topicProgress[0]['Test'], "Time": topicProgress[0]['TestTime']}
             return Response({"quiz": progressOfTopics, "test": test})
         except Exception as e:
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -296,10 +306,6 @@ class data(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # pushProgressData()
-        # pushTopicsData()
-        # pushQuestions()
-        # addAdminUser()
 
         temp()
         return Response("message")
@@ -313,6 +319,8 @@ class ResetPassword(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             data = request.data
@@ -323,20 +331,6 @@ class ResetPassword(APIView):
             return Response({"message": "Success"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-def addAdminUser():
-    adminUser = UserDetails.objects.create(
-        firstName="Bolt",
-        lastName="Abacus",
-        phoneNumber="+919032024912",
-        email="boltabacus.dev@gmail.com",
-        role="Admin",
-        encryptedPassword="password1",
-        created_date=datetime.datetime.now(),
-        blocked=False
-    )
-    adminUser.save()
 
 
 def secondsToMinutes(time):
@@ -939,6 +933,8 @@ class UpdateBatchLink(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             batchId = data["batchId"]
@@ -965,6 +961,8 @@ class GetTeacherBatches(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -1003,6 +1001,8 @@ class UpdateClass(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             batchId = data["batchId"]
@@ -1062,6 +1062,8 @@ class GetClassReport(APIView):
             requestUserToken = request.headers['AUTH-TOKEN']
             try:
                 requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
             except Exception as e:
                 return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
             teacher = UserDetails.objects.filter(userId=requestUserId).first()
@@ -1121,70 +1123,99 @@ class GetStudentProgress(APIView):
         try:
             data = request.data
             userId = data["userId"]
-            user = UserDetails.objects.filter(userId=userId).first()
-            if user is None:
-                return Response({"message": "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
-            if user.role != "Student":
-                return Response({"message": "User is not a Student"}, status=status.HTTP_403_FORBIDDEN)
-            student = Student.objects.filter(user_id=userId).first()
-            batchId = student.batch_id
-            batch = Batch.objects.filter(batchId=batchId).first()
-            studentProgress = Progress.objects.filter(user_id=userId)
-            levelsProgress = {}
-            for progress in studentProgress:
-                curriculum = Curriculum.objects.filter(quizId=progress.quiz_id).first()
-                levelId = curriculum.levelId
-                classId = curriculum.classId
-                topicId = curriculum.topicId
-                counter = True
-                if classId == 1 and levelId == 1:
-                    counter = False
-                if counter:
-                    try:
-                        classProgress = levelsProgress[levelId]
-                    except:
-                        levelsProgress[levelId] = {}
-                        classProgress = levelsProgress[levelId]
-                    try:
-                        topicProgress = classProgress[classId]
-                    except:
-                        classProgress[classId] = {}
-                        topicProgress = classProgress[classId]
-                    try:
-                        topicProgress[topicId].update({curriculum.quizType: progress.percentage})
-                    except:
-                        topicProgress[topicId] = {curriculum.quizType: progress.percentage}
-            levelsProgressData = []
-            for levelId in levelsProgress:
-                levelsProgressJson = {"levelId": levelId}
-                classProgressData = []
-                classProgress = levelsProgress[levelId]
-                for classId in classProgress:
-                    classProgressJson = {"classId": classId}
-                    topicProgress = classProgress[classId]
-                    topicProgressData = []
-                    for topicId in topicProgress:
-                        if topicId != 0:
-                            result = topicProgress[topicId]
-                            topicProgressData.append({"topicId": topicId,
-                                                      "Classwork": result['Classwork'],
-                                                      "Homework": result['Homework']})
-                    classProgressJson.update({"Test": topicProgress[0]['Test']})
-                    classProgressJson.update({"topics": topicProgressData})
-                    classProgressData.append(classProgressJson)
-                levelsProgressJson.update({"classes": classProgressData})
-                levelsProgressData.append(levelsProgressJson)
-            for classes in levelsProgressData:
-                classes['classes'] = sorted(classes['classes'], key=lambda x: x['classId'])
-                for topics in classes['classes']:
-                    topics['topics'] = sorted(topics['topics'], key=lambda x: x['topicId'])
-
-            return Response({"firstName": user.firstName,
-                             "lastName": user.lastName,
-                             "batchName": batch.batchName,
-                             "levels": levelsProgressData}, status=status.HTTP_200_OK)
+            return getStudentProgress(userId)
         except Exception as e:
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetStudentProgressFromStudent(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers['AUTH-TOKEN']
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            return getStudentProgress(userId)
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def getStudentProgress(userId):
+    try:
+        user = UserDetails.objects.filter(userId=userId).first()
+        if user is None:
+            return Response({"message": "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
+        if user.role != "Student":
+            return Response({"message": "User is not a Student"}, status=status.HTTP_403_FORBIDDEN)
+        student = Student.objects.filter(user_id=userId).first()
+        batchId = student.batch_id
+        batch = Batch.objects.filter(batchId=batchId).first()
+        studentProgress = Progress.objects.filter(user_id=userId)
+        levelsProgress = {}
+        for progress in studentProgress:
+            curriculum = Curriculum.objects.filter(quizId=progress.quiz_id).first()
+            levelId = curriculum.levelId
+            classId = curriculum.classId
+            topicId = curriculum.topicId
+            counter = True
+            if classId == 1 and levelId == 1:
+                counter = False
+            if counter:
+                try:
+                    classProgress = levelsProgress[levelId]
+                except:
+                    levelsProgress[levelId] = {}
+                    classProgress = levelsProgress[levelId]
+                try:
+                    topicProgress = classProgress[classId]
+                except:
+                    classProgress[classId] = {}
+                    topicProgress = classProgress[classId]
+                try:
+                    topicProgress[topicId].update(
+                        {curriculum.quizType: progress.percentage, curriculum.quizType + "Time": progress.time})
+                except:
+                    topicProgress[topicId] = {curriculum.quizType: progress.percentage,
+                                              curriculum.quizType + "Time": progress.time}
+        levelsProgressData = []
+        for levelId in levelsProgress:
+            levelsProgressJson = {"levelId": levelId}
+            classProgressData = []
+            classProgress = levelsProgress[levelId]
+            for classId in classProgress:
+                classProgressJson = {"classId": classId}
+                topicProgress = classProgress[classId]
+                topicProgressData = []
+                for topicId in topicProgress:
+                    if topicId != 0:
+                        result = topicProgress[topicId]
+                        topicProgressData.append({"topicId": topicId,
+                                                  "Classwork": result['Classwork'],
+                                                  "ClassworkTime": result['ClassworkTime'],
+                                                  "Homework": result['Homework'],
+                                                  "HomeworkTime": result['HomeworkTime']})
+                classProgressJson.update({"Test": topicProgress[0]['Test'], "Time": topicProgress[0]['TestTime']})
+                classProgressJson.update({"topics": topicProgressData})
+                classProgressData.append(classProgressJson)
+            levelsProgressJson.update({"classes": classProgressData})
+            levelsProgressData.append(levelsProgressJson)
+        for classes in levelsProgressData:
+            classes['classes'] = sorted(classes['classes'], key=lambda x: x['classId'])
+            for topics in classes['classes']:
+                topics['topics'] = sorted(topics['topics'], key=lambda x: x['topicId'])
+
+        return Response({"firstName": user.firstName,
+                         "lastName": user.lastName,
+                         "batchName": batch.batchName,
+                         "levels": levelsProgressData}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def getClassIds(levelId):
