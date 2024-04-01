@@ -306,7 +306,6 @@ class data(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-
         temp()
         return Response("message")
 
@@ -505,7 +504,11 @@ class GetAllBatches(APIView):
         batchIdDetails = Batch.objects.all().values()
         batchIds = []
         for batchId in batchIdDetails:
-            batchIds.append({"batchId": batchId['batchId'], "batchName": batchId['batchName']})
+            batchIds.append(
+                {"batchId": batchId['batchId'], "batchName": batchId['batchName'], "timeDay": batchId['timeDay'],
+                 "timeSchedule": batchId['timeSchedule'], "numberOfStudents": batchId['numberOfStudents'],
+                 "active": batchId['active'], "latestLevelId": batchId['latestLevelId'],
+                 "latestClassId": batchId['latestClassId'], "latestLink": batchId["latestLink"]})
         return Response({"batches": batchIds})
 
 
@@ -1247,6 +1250,43 @@ def progressPresent(quizId, userId):
         return False
     else:
         return True
+
+
+class BulkAddQuestions(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            requestLevelId = data['levelId']
+            requestClassId = data['classId']
+            requestQuizType = data['quizType']
+            requestTopicId = data['topicId']
+            questions = data['questions']
+            for questionIndex in questions:
+
+                questionJson = questionIndex['question']
+                correctAnswer = questionIndex['correctAnswer']
+                if requestQuizType == 'Test':
+                    curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                                  classId=requestClassId,
+                                                                  quizType=requestQuizType).first()
+                else:
+                    curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                                  classId=requestClassId,
+                                                                  topicId=requestTopicId,
+                                                                  quizType=requestQuizType).first()
+                if curriculumDetails is None:
+                    return Response({"message": "Quiz doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
+                quizId = curriculumDetails.quizId
+                questionString = json.dumps(questionJson)
+                questionObject = QuizQuestions.objects.create(question=questionString,
+                                                              quiz_id=quizId,
+                                                              correctAnswer=correctAnswer)
+                questionObject.save()
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def temp():

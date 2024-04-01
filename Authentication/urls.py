@@ -35,7 +35,8 @@ urlpatterns = [
     path('updateClass/', views.UpdateClass.as_view()),
     path('getClassReport/', views.GetClassReport.as_view()),
     path('getStudentProgress/', views.GetStudentProgress.as_view()),
-    path('getStudentProgressStudent/', views.GetStudentProgressFromStudent.as_view())
+    path('getStudentProgressStudent/', views.GetStudentProgressFromStudent.as_view()),
+    path('bulkAddQuestions/', views.BulkAddQuestions.as_view())
 
     # path('getStudents/', views.GetStudents.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),
