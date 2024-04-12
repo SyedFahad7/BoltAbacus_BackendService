@@ -1289,6 +1289,84 @@ class BulkAddQuestions(APIView):
             return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class ForgotPassword(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+        email = data['email'].lower()
+        user = UserDetails.objects.filter(email=email).first()
+        if user is not None:
+            payload = {
+                "UserId": user.userId,
+                "role": user.role,
+                "expiryTime": str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
+                "creationTime": str(datetime.datetime.utcnow())
+            }
+            secretKey = "BoltAbacus"
+            loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
+            userName = user.firstName + " " + user.lastName
+            sendLinkEmail(loginToken, userName, email)
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"message": "The user doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ResetPasswordV2(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            requestUserToken = data['token']
+            if not checkExpiry(requestUserToken):
+                return Response({"message": "Token has Expired."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({"error": repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            password = data["password"]
+            user = UserDetails.objects.filter(userId=requestUserId).first()
+            user.encryptedPassword = password
+            user.save()
+            return Response({"message": "Success"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def checkExpiry(token):
+    try:
+        secretKey = "BoltAbacus"
+        payload = jwt.decode(token, secretKey, algorithms=['HS256'])
+        expiryTime = payload['expiryTime'].split(".")[0]
+        convertedExpiryTime = datetime.datetime.strptime(expiryTime, "%Y-%m-%d %H:%M:%S")
+        if convertedExpiryTime < datetime.datetime.utcnow():
+            return False
+        return True
+    except Exception as e:
+        return e
+
+
+def sendLinkEmail(token, userName, emailId):
+    url = "boltabacus.com/resetPassword/v2/" + token
+    content = {
+        'url': url,
+        "name": userName
+    }
+    template = loader.get_template('ForgotPasswordTemplate.html').render(content)
+    email = EmailMessage(
+        ("Link To change your Password"),
+        template,
+        'boltabacus.dev@gmail.com',
+        [emailId]
+    )
+    email.content_subtype = 'html'
+    result = email.send()
+    return result
+
+
 def temp():
     print(TopicDetails.objects.filter(levelId=3).values())
     # print(Batch.objects.all().values())

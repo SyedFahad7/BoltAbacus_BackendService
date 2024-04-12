@@ -10,6 +10,7 @@ urlpatterns = [
     path('report/', views.ReportDetails.as_view()),
     path('data/', views.data().as_view()),
     path('resetPassword/', views.ResetPassword.as_view()),
+    path('resetPassword/v2/', views.ResetPasswordV2.as_view()),
 
     path('addQuestion/', views.AddQuestion.as_view()),
     path('getQuestion/', views.GetQuestion.as_view()),
@@ -36,8 +37,8 @@ urlpatterns = [
     path('getClassReport/', views.GetClassReport.as_view()),
     path('getStudentProgress/', views.GetStudentProgress.as_view()),
     path('getStudentProgressStudent/', views.GetStudentProgressFromStudent.as_view()),
-    path('bulkAddQuestions/', views.BulkAddQuestions.as_view())
-
+    path('bulkAddQuestions/', views.BulkAddQuestions.as_view()),
+    path('forgotPassword/', views.ForgotPassword.as_view())
     # path('getStudents/', views.GetStudents.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),
 
