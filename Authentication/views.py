@@ -1263,22 +1263,23 @@ class BulkAddQuestions(APIView):
             requestQuizType = data['quizType']
             requestTopicId = data['topicId']
             questions = data['questions']
+            if requestQuizType == 'Test':
+                curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                              classId=requestClassId,
+                                                              quizType=requestQuizType).first()
+            else:
+                curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                              classId=requestClassId,
+                                                              topicId=requestTopicId,
+                                                              quizType=requestQuizType).first()
+            if curriculumDetails is None:
+                return Response({"message": "Quiz doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
+            quizId = curriculumDetails.quizId
+            QuizQuestions.objects.filter(quiz_id=quizId).delete()
             for questionIndex in questions:
 
                 questionJson = questionIndex['question']
                 correctAnswer = questionIndex['correctAnswer']
-                if requestQuizType == 'Test':
-                    curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
-                                                                  classId=requestClassId,
-                                                                  quizType=requestQuizType).first()
-                else:
-                    curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
-                                                                  classId=requestClassId,
-                                                                  topicId=requestTopicId,
-                                                                  quizType=requestQuizType).first()
-                if curriculumDetails is None:
-                    return Response({"message": "Quiz doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
-                quizId = curriculumDetails.quizId
                 questionString = json.dumps(questionJson)
                 questionObject = QuizQuestions.objects.create(question=questionString,
                                                               quiz_id=quizId,
