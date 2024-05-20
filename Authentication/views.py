@@ -654,7 +654,7 @@ class AddTeacher(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
-            if user.role == Constants.SUB_ADMIN:
+            if user.role == Constants.SUB_ADMIN or user.role == Constants.ADMIN:
                 data = request.data
                 password = generatePassword()
                 firstName = data[Constants.FIRST_NAME]
@@ -783,7 +783,7 @@ class AddStudent(APIView):
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
         user = UserDetails.objects.filter(userId=userId).first()
-        if user.role == Constants.SUB_ADMIN:
+        if user.role == Constants.SUB_ADMIN or user.role == Constants.ADMIN:
             organizationDetails = OrganizationTag.objects.filter(tagId=user.tag_id).first()
             if (organizationDetails.totalNumberOfStudents - organizationDetails.numberOfStudents) <= 0:
                 return Response({Constants.JSON_MESSAGE: "The account has reached maximum student it can add. Please "
@@ -1683,11 +1683,15 @@ class BulkAddStudents(APIView):
 
 
 def temp():
-    print(TopicDetails.objects.filter(levelId=3).values())
+    # print(TopicDetails.objects.filter(levelId=3).values())
     print(OrganizationTag.objects.all().values())
-    # user = UserDetails.objects.filter(userId=120).first()
+    # user = UserDetails.objects.filter(role=Constants.TEACHER)
+    # count=0
+    # for i in user:
+    #     count+=1
+    # print(count)
     # print(user.tag_id)
-    print(Batch.objects.all().values())
+    # print(Batch.objects.all().values())
     # print(Curriculum.objects.filter(levelId=1, classId=4).values(), "\n")
     # print(Progress.objects.filter(user_id=2).values())
 

@@ -42,6 +42,7 @@ TIME = "time"
 TEACHER = "Teacher"
 STUDENT = "Student"
 SUB_ADMIN = "SubAdmin"
+ADMIN = "Admin"
 
 TAG_ID = "tagId"
 ORGANIZATION_NAME = "organizationName"
