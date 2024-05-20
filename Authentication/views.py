@@ -1320,7 +1320,7 @@ def getNextClass(levelId, classId, tag_id):
         return -2, -2
     if levelId > 10 or levelId < 0:
         return -3, -3
-    if levelId > maxLevelAllowed or (levelId == maxLevelAllowed and classId > maxClassAllowed):
+    if levelId > maxLevelAllowed or (levelId == maxLevelAllowed and classId >= maxClassAllowed):
         return -4, -4
     if classId == 12:
         if levelId != 10:
