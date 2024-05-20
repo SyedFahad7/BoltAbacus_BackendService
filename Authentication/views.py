@@ -13,7 +13,7 @@ from . import Constants
 from Authentication.models import (UserDetails, Student,
                                    Batch, Curriculum,
                                    TopicDetails, QuizQuestions,
-                                   Progress, Teacher)
+                                   Progress, Teacher, OrganizationTag)
 
 
 # ------------ Student Related APIs -----------------------
@@ -32,11 +32,18 @@ class SignIn(APIView):
             user = user.first()
             user_password = user[Constants.ENCRYPTED_PASSWORD]
             if password == user_password:
+                organization = OrganizationTag.objects.filter(tagId=user["tag_id"]).first()
+                organizationExpirationDate = organization.expirationDate
+                if organizationExpirationDate < datetime.date.today():
+                    return Response({Constants.JSON_MESSAGE: "The subscription has expired. Please contact the "
+                                                             "administrator to renew it."},
+                                    status=status.HTTP_403_FORBIDDEN)
                 payload = {
                     Constants.USER_ID: user[Constants.USER_ID],
                     Constants.ROLE: user[Constants.ROLE],
                     Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
-                    "creationTime": str(datetime.datetime.utcnow())
+                    "creationTime": str(datetime.datetime.utcnow()),
+                    Constants.ORGANIZATION_EXPIRATION_DATE: str(organizationExpirationDate)
                 }
                 secretKey = Constants.SECRET_KEY
                 loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
@@ -46,15 +53,18 @@ class SignIn(APIView):
                     Constants.FIRST_NAME: user[Constants.FIRST_NAME],
                     Constants.LAST_NAME: user[Constants.LAST_NAME],
                     "phone": user[Constants.PHONE_NUMBER],
+                    Constants.ORGANIZATION_NAME: organization.organizationName,
                     "token": loginToken
                 },
                     status=status.HTTP_200_OK
                 )
                 return response
             else:
-                return Response({Constants.JSON_MESSAGE: "Invalid Password. Try Again"}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({Constants.JSON_MESSAGE: "Invalid Password. Try Again"},
+                                status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return Response({Constants.JSON_MESSAGE: "Invalid Credentials. Try Again"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({Constants.JSON_MESSAGE: "Invalid Credentials. Try Again"},
+                            status=status.HTTP_401_UNAUTHORIZED)
 
 
 class CurrentLevels(APIView):
@@ -74,7 +84,8 @@ class CurrentLevels(APIView):
             latestLevel = userBatch[Constants.LATEST_LEVEL_ID]
             latestLink = userBatch[Constants.LATEST_LINK]
             latestClass = userBatch[Constants.LATEST_CLASS_ID]
-            return Response({Constants.LEVEL_ID: latestLevel, Constants.LATEST_CLASS: latestClass, Constants.LATEST_LINK: latestLink},
+            return Response({Constants.LEVEL_ID: latestLevel, Constants.LATEST_CLASS: latestClass,
+                             Constants.LATEST_LINK: latestLink},
                             status=status.HTTP_200_OK)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -212,7 +223,8 @@ class QuizCorrection(APIView):
                     numberOfCorrectAnswers += 1
                 question = json.loads(questionObject.question)
                 questionString = ConvertToString(question)
-                verdictList.append({Constants.QUESTION: questionString, "verdict": verdict, Constants.ANSWER: answer[Constants.ANSWER]})
+                verdictList.append({Constants.QUESTION: questionString, "verdict": verdict,
+                                    Constants.ANSWER: answer[Constants.ANSWER]})
             if (numberOfCorrectAnswers / numberOfAnswers) >= 0.75:
                 isPass = True
             try:
@@ -281,7 +293,8 @@ class ReportDetails(APIView):
                 progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).values().first()
                 try:
                     topicProgress[quizDetails.topicId].update(
-                        {quizDetails.quizType: progress[Constants.PERCENTAGE], quizDetails.quizType + "Time": progress[Constants.TIME]})
+                        {quizDetails.quizType: progress[Constants.PERCENTAGE],
+                         quizDetails.quizType + "Time": progress[Constants.TIME]})
                 except:
                     topicProgress[quizDetails.topicId] = {quizDetails.quizType: progress[Constants.PERCENTAGE],
                                                           quizDetails.quizType + "Time": progress[Constants.TIME]}
@@ -389,7 +402,7 @@ def ConvertToString(questionJson):
 
 # -------------------- Admin Related APIs ----------------------
 
-class getAllQuestions(APIView):
+class GetAllQuestions(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -500,15 +513,28 @@ class GetAllBatches(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        batchIdDetails = Batch.objects.all().values()
-        batchIds = []
-        for batchId in batchIdDetails:
-            batchIds.append(
-                {Constants.BATCH_ID: batchId[Constants.BATCH_ID], Constants.BATCH_NAME: batchId[Constants.BATCH_NAME], "timeDay": batchId['timeDay'],
-                 "timeSchedule": batchId['timeSchedule'], "numberOfStudents": batchId['numberOfStudents'],
-                 "active": batchId['active'], Constants.LATEST_LEVEL_ID: batchId[Constants.LATEST_LEVEL_ID],
-                 Constants.LATEST_CLASS_ID: batchId[Constants.LATEST_CLASS_ID], Constants.LATEST_LINK: batchId[Constants.LATEST_LINK]})
-        return Response({"batches": batchIds})
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            batchIdDetails = Batch.objects.filter(tag_id=user.tag_id).values()
+            batchIds = []
+            for batchId in batchIdDetails:
+                batchIds.append(
+                    {Constants.BATCH_ID: batchId[Constants.BATCH_ID], Constants.BATCH_NAME: batchId[Constants.BATCH_NAME],
+                     "timeDay": batchId['timeDay'],
+                     "timeSchedule": batchId['timeSchedule'], "numberOfStudents": batchId['numberOfStudents'],
+                     "active": batchId['active'], Constants.LATEST_LEVEL_ID: batchId[Constants.LATEST_LEVEL_ID],
+                     Constants.LATEST_CLASS_ID: batchId[Constants.LATEST_CLASS_ID],
+                     Constants.LATEST_LINK: batchId[Constants.LATEST_LINK]})
+            return Response({"batches": batchIds})
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AddBatch(APIView):
@@ -532,7 +558,8 @@ class AddBatch(APIView):
                     active=True,
                     batchName=batchName,
                     latestLevelId=1,
-                    latestClassId=1
+                    latestClassId=1,
+                    tag_id=user.tag_id
                 )
 
                 teacher = Teacher.objects.create(
@@ -619,36 +646,55 @@ class AddTeacher(APIView):
 
     def post(self, request):
         try:
-            data = request.data
-            password = generatePassword()
-            firstName = data['firstName']
-            lastName = data['lastName']
-            phoneNumber = data[Constants.PHONE_NUMBER]
-            email = data['email']
-            email = email.lower()
-            if UserDetails.objects.filter(email=email).first() is not None:
-                return Response({Constants.JSON_MESSAGE: "User with this email already Exists"}, status=status.HTTP_400_BAD_REQUEST)
-            user = UserDetails.objects.create(
-                firstName=firstName,
-                lastName=lastName,
-                phoneNumber=phoneNumber,
-                email=email,
-                role=Constants.TEACHER,
-                encryptedPassword=encryptPassword(password),
-                created_date=datetime.datetime.now(),
-                blocked=False
-            )
-            user.save()
-            email = EmailMessage(
-                'Account has been Created',
-                "An account has been created for this email id for the teacher role. The password is " + password + ". Please login and change your password",
-                'boltabacus.dev@gmail.com',
-                [email, 'boltabacus.dev@gmail.com']
-            )
-            email.send()
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user.role == Constants.SUB_ADMIN:
+                data = request.data
+                password = generatePassword()
+                firstName = data[Constants.FIRST_NAME]
+                lastName = data[Constants.LAST_NAME]
+                phoneNumber = data[Constants.PHONE_NUMBER]
+                email = data[Constants.EMAIL]
+                email = email.lower()
+                tag = user.tag_id
+                if UserDetails.objects.filter(email=email).first() is not None:
+                    return Response({Constants.JSON_MESSAGE: "User with this email already Exists"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                user = UserDetails.objects.create(
+                    firstName=firstName,
+                    lastName=lastName,
+                    phoneNumber=phoneNumber,
+                    email=email,
+                    role=Constants.TEACHER,
+                    encryptedPassword=encryptPassword(password),
+                    created_date=datetime.datetime.now(),
+                    blocked=False,
+                    tag_id=tag
+                )
+                user.save()
 
-            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE},
-                            status=status.HTTP_200_OK)
+                organizationDetails = OrganizationTag.objects.filter(tagId=user.tag_id).first()
+                organizationDetails.numberOfTeachers += 1
+                organizationDetails.save()
+                email = EmailMessage(
+                    'Account has been Created',
+                    "An account has been created for this email id for the teacher role. The password is " + password + ". Please login and change your password",
+                    'boltabacus.dev@gmail.com',
+                    [email, 'boltabacus.dev@gmail.com']
+                )
+                email.send()
+
+                return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE},
+                                status=status.HTTP_200_OK)
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -659,8 +705,15 @@ class GetTeachers(APIView):
 
     def get(self, request):
         try:
-
-            teacherDetails = UserDetails.objects.filter(role=Constants.TEACHER)
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            teacherDetails = UserDetails.objects.filter(role=Constants.TEACHER, tag_id=user.tag_id)
             teachers = []
             for teacher in teacherDetails:
                 teachers.append({Constants.USER_ID: teacher.userId,
@@ -722,7 +775,23 @@ class AddStudent(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        return createUser(request, Student, Constants.STUDENT)
+        requestUserToken = request.headers[Constants.TOKEN_HEADER]
+        try:
+            userId = IdExtraction(requestUserToken)
+            if isinstance(userId, Exception):
+                raise Exception(requestUserToken)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+        user = UserDetails.objects.filter(userId=userId).first()
+        if user.role == Constants.SUB_ADMIN:
+            organizationDetails = OrganizationTag.objects.filter(tagId=user.tag_id).first()
+            if (organizationDetails.totalNumberOfStudents - organizationDetails.numberOfStudents) <= 0:
+                return Response({Constants.JSON_MESSAGE: "The account has reached maximum student it can add. Please "
+                                                         "contact the administration to increase the limit."},
+                                status=status.HTTP_403_FORBIDDEN)
+            return createUser(request.data, Student, Constants.STUDENT, organizationDetails)
+        else:
+            return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class GetStudents(APIView):
@@ -784,17 +853,17 @@ def getBatchList():
     return batchIds
 
 
-def createUser(request, dbObject, role):
+def createUser(data, dbObject, role, organizationTag):
     try:
-        data = request.data
 
-        firstName = data['firstName']
-        lastName = data['lastName']
+        firstName = data[Constants.FIRST_NAME]
+        lastName = data[Constants.LAST_NAME]
         phoneNumber = data[Constants.PHONE_NUMBER]
-        emailId = data['email']
+        emailId = data[Constants.EMAIL]
         emailId = emailId.lower()
-        if UserDetails.objects.filter(email=emailId).first() != None:
-            return Response({Constants.JSON_MESSAGE: "User with this emailId already Exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if UserDetails.objects.filter(email=emailId).first() is not None:
+            return Response({Constants.JSON_MESSAGE: "User with this emailId already Exists"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         password = generatePassword()
 
@@ -809,7 +878,8 @@ def createUser(request, dbObject, role):
                 role=role,
                 encryptedPassword=encryptPassword(password),
                 created_date=datetime.datetime.now(),
-                blocked=False
+                blocked=False,
+                tag_id=organizationTag.tagId
             )
             user.save()
 
@@ -818,7 +888,8 @@ def createUser(request, dbObject, role):
                 batch_id=batchId
             )
             roleRelatedObject.save()
-
+            organizationTag.numberOfStudents += 1
+            organizationTag.save()
             if role == Constants.STUDENT:
                 batchDetails = Batch.objects.filter(batchId=batchId).first()
                 latestLevel = batchDetails.latestLevelId
@@ -988,7 +1059,8 @@ class GetTeacherBatches(APIView):
                 batchId = teacherBatch.batchId
                 batch = Batch.objects.filter(batchId=batchId).first()
                 batches[batch.timeDay].append(
-                    {Constants.BATCH_ID: batch.batchId, Constants.BATCH_NAME: batch.batchName, "timings": batch.timeSchedule})
+                    {Constants.BATCH_ID: batch.batchId, Constants.BATCH_NAME: batch.batchName,
+                     "timings": batch.timeSchedule})
             return Response({"batches": batches})
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1014,16 +1086,21 @@ class UpdateClass(APIView):
             latestLevel = batch.latestLevelId
             latestClass = batch.latestClassId
             teacher = Teacher.objects.filter(user_id=userId, batchId=batchId).first()
+            user = UserDetails.objects.filter(userId=userId).first()
             if teacher is None:
                 return Response({Constants.JSON_MESSAGE: "This User is not the Teacher for this batch."},
                                 status=status.HTTP_403_FORBIDDEN)
-            nextLevel, nextClass = getNextClass(latestLevel, latestClass)
-            if nextClass == -1 or nextClass == -1:
+            nextLevel, nextClass = getNextClass(latestLevel, latestClass, user.tag_id)
+            if nextClass == -1 or nextLevel == -1:
                 return Response({Constants.JSON_MESSAGE: "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
-            if nextClass == -2 or nextClass == -2:
+            if nextClass == -2 or nextLevel == -2:
                 return Response({Constants.JSON_MESSAGE: "Class is out of Range"}, status=status.HTTP_403_FORBIDDEN)
-            if nextClass == -3 or nextClass == -3:
+            if nextClass == -3 or nextLevel == -3:
                 return Response({Constants.JSON_MESSAGE: "Level is out of Range"}, status=status.HTTP_403_FORBIDDEN)
+            if nextLevel == -4 or nextClass == -4:
+                return Response({Constants.JSON_MESSAGE: "This is the max level and class allowed. Please contact "
+                                                         "the Administrator for further Details."},
+                                status=status.HTTP_403_FORBIDDEN)
 
             students = Student.objects.filter(batch_id=batchId)
             curriculum = Curriculum.objects.filter(levelId=nextLevel, classId=nextClass)
@@ -1043,7 +1120,8 @@ class UpdateClass(APIView):
             batch.latestClassId = nextClass
             batch.latestLevelId = nextLevel
             batch.save()
-            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE, "level": nextLevel, "class": nextClass}, status=status.HTTP_200_OK)
+            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE, "level": nextLevel, "class": nextClass},
+                            status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1060,7 +1138,8 @@ class GetClassReport(APIView):
             classId = data[Constants.CLASS_ID]
             topicId = data[Constants.TOPIC_ID]
             if levelId == 1 and classId == 1:
-                return Response({Constants.JSON_MESSAGE: "This class doesn't have a quiz"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({Constants.JSON_MESSAGE: "This class doesn't have a quiz"},
+                                status=status.HTTP_404_NOT_FOUND)
             requestUserToken = request.headers[Constants.TOKEN_HEADER]
             try:
                 requestUserId = IdExtraction(requestUserToken)
@@ -1075,7 +1154,8 @@ class GetClassReport(APIView):
                 return Response({Constants.JSON_MESSAGE: "User is not a teacher."}, status=status.HTTP_403_FORBIDDEN)
             batchTeacher = Teacher.objects.filter(user_id=requestUserId, batchId=batchId).first()
             if batchTeacher is None:
-                return Response({Constants.JSON_MESSAGE: "Teacher is not assigned to the batch."}, status=status.HTTP_403_FORBIDDEN)
+                return Response({Constants.JSON_MESSAGE: "Teacher is not assigned to the batch."},
+                                status=status.HTTP_403_FORBIDDEN)
             classwork = Curriculum.objects.filter(levelId=levelId,
                                                   classId=classId,
                                                   topicId=topicId,
@@ -1105,8 +1185,9 @@ class GetClassReport(APIView):
                 testProgress = Progress.objects.filter(quiz_id=testId,
                                                        user_id=userId).first()
                 if classworkProgress is None or homeworkProgress is None or testProgress is None:
-                    return Response({Constants.JSON_MESSAGE: "Report not found for student " + user.firstName + user.lastName},
-                                    status=status.HTTP_404_NOT_FOUND)
+                    return Response(
+                        {Constants.JSON_MESSAGE: "Report not found for student " + user.firstName + user.lastName},
+                        status=status.HTTP_404_NOT_FOUND)
                 studentReports.append({Constants.USER_ID: user.userId,
                                        Constants.FIRST_NAME: user.firstName,
                                        Constants.LAST_NAME: user.lastName,
@@ -1201,7 +1282,8 @@ def getStudentProgress(userId):
                                                   Constants.CLASSWORK_TIME: result[Constants.CLASSWORK_TIME],
                                                   Constants.HOMEWORK: result[Constants.HOMEWORK],
                                                   Constants.HOMEWORK_TIME: result[Constants.HOMEWORK_TIME]})
-                classProgressJson.update({Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]})
+                classProgressJson.update(
+                    {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]})
                 classProgressJson.update({"topics": topicProgressData})
                 classProgressData.append(classProgressJson)
             levelsProgressJson.update({"classes": classProgressData})
@@ -1228,12 +1310,16 @@ def getClassIds(levelId):
     return classIds
 
 
-def getNextClass(levelId, classId):
+def getNextClass(levelId, classId, tag_id):
+    organizationsDetails = OrganizationTag.objects.filter(tagId=tag_id)
+    maxLevelAllowed = organizationsDetails.maxLevel
+    maxClassAllowed = organizationsDetails.maxClass
     if classId > 12 or classId < 0:
         return -2, -2
     if levelId > 10 or levelId < 0:
         return -3, -3
-
+    if levelId > maxLevelAllowed or (levelId == maxLevelAllowed and classId > maxClassAllowed):
+        return -4, -4
     if classId == 12:
         if levelId != 10:
             return levelId + 1, 1
@@ -1294,14 +1380,19 @@ class ForgotPassword(APIView):
 
     def post(self, request):
         data = request.data
-        email = data['email'].lower()
+        email = data[Constants.EMAIL].lower()
         user = UserDetails.objects.filter(email=email).first()
         if user is not None:
+
+            organization = OrganizationTag.objects.filter(tagId=user["tag_id"]).first()
+            organizationExpirationDate = organization.expirationDate
             payload = {
                 Constants.USER_ID: user.userId,
                 Constants.ROLE: user.role,
                 Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
-                "creationTime": str(datetime.datetime.utcnow())
+                "creationTime": str(datetime.datetime.utcnow()),
+                Constants.ORGANIZATION_EXPIRATION_DATE: str(organizationExpirationDate)
+
             }
             secretKey = Constants.SECRET_KEY
             loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
@@ -1357,7 +1448,7 @@ def sendLinkEmail(token, userName, emailId):
     }
     template = loader.get_template('ForgotPasswordTemplate.html').render(content)
     email = EmailMessage(
-        ("Link To change your Password"),
+        "Link To change your Password",
         template,
         'boltabacus.dev@gmail.com',
         [emailId]
@@ -1367,9 +1458,236 @@ def sendLinkEmail(token, userName, emailId):
     return result
 
 
+# -------------------- Sub-Admin Related APIs ----------------------
+
+class AddSubAdmin(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            password = generatePassword()
+            firstName = data[Constants.FIRST_NAME]
+            lastName = data[Constants.LAST_NAME]
+            phoneNumber = data[Constants.PHONE_NUMBER]
+            email = data[Constants.EMAIL].lower()
+            tagName = data[Constants.TAG_NAME]
+            orgTag = OrganizationTag.objects.filter(tagName=tagName).first()
+            if UserDetails.objects.filter(email=email).first() is not None:
+                return Response({Constants.JSON_MESSAGE: "User with this email already Exists"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            user = UserDetails.objects.create(
+                firstName=firstName,
+                lastName=lastName,
+                phoneNumber=phoneNumber,
+                email=email,
+                role=Constants.SUB_ADMIN,
+                encryptedPassword=encryptPassword(password),
+                created_date=datetime.datetime.now(),
+                blocked=False,
+                tag_id=orgTag.tagId
+            )
+            user.save()
+            email = EmailMessage(
+                'Account has been Created',
+                "An account has been created for this email id for the sub-Admin role. The password is " + password + ". Please login and change your password",
+                'boltabacus.dev@gmail.com',
+                [email, 'boltabacus.dev@gmail.com']
+            )
+            email.send()
+
+            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE},
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetAllOrganizationTagNames(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            organizations = OrganizationTag.objects.all()
+            tagNames = []
+            for organization in organizations:
+                tagNames.append(organization.tagName)
+            return Response({"tagNames": tagNames}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddOrganizationTagDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            requestData = request.data
+            date = requestData[Constants.EXPIRATION_DATE].split("-")
+            dateAccToDB = datetime.date(int(date[0]), int(date[1]), int(date[2]))
+            OrganizationTag.objects.create(
+                organizationName=requestData[Constants.ORGANIZATION_NAME],
+                tagName=requestData[Constants.TAG_NAME],
+                isIndividualTeacher=requestData[Constants.IS_INDIVIDUAL_TEACHER],
+                numberOfTeachers=requestData[Constants.NUMBER_OF_TEACHERS],
+                numberOfStudents=requestData[Constants.NUMBER_OF_STUDENTS],
+                expirationDate=dateAccToDB,
+                totalNumberOfStudents=requestData[Constants.TOTAL_NUMBER_OF_STUDENTS],
+                maxLevel=requestData[Constants.MAX_LEVEL],
+                maxClass=requestData[Constants.MAX_CLASS]
+            )
+            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetOrganizationTagDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            requestData = request.data
+            tagName = requestData[Constants.TAG_NAME]
+            organization = OrganizationTag.objects.filter(tagName=tagName).first()
+            if organization is None:
+                return Response({Constants.JSON_MESSAGE: "Tag Not Found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                Constants.TAG_ID: organization.tagId,
+                Constants.ORGANIZATION_NAME: organization.organizationName,
+                Constants.TAG_NAME: organization.tagName,
+                Constants.IS_INDIVIDUAL_TEACHER: organization.isIndividualTeacher,
+                Constants.NUMBER_OF_TEACHERS: organization.numberOfTeachers,
+                Constants.NUMBER_OF_STUDENTS: organization.numberOfStudents,
+                Constants.EXPIRATION_DATE: organization.expirationDate,
+                Constants.TOTAL_NUMBER_OF_STUDENTS: organization.totalNumberOfStudents,
+                Constants.MAX_LEVEL: organization.maxLevel,
+                Constants.MAX_CLASS: organization.maxClass
+            })
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UpdateOrganizationDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            requestData = request.data
+            date = requestData[Constants.EXPIRATION_DATE].split("-")
+            dateAccToDB = datetime.date(int(date[0]), int(date[1]), int(date[2]))
+            organization = OrganizationTag.objects.filter(tagName=requestData[Constants.TAG_NAME]).first()
+            organization.organizationName = requestData[Constants.ORGANIZATION_NAME]
+            organization.isIndividualTeacher = bool(requestData[Constants.IS_INDIVIDUAL_TEACHER])
+            organization.numberOfTeachers = int(requestData[Constants.NUMBER_OF_TEACHERS])
+            organization.numberOfStudents = int(requestData[Constants.NUMBER_OF_STUDENTS])
+            organization.expirationDate = dateAccToDB
+            organization.totalNumberOfStudents = int(requestData[Constants.TOTAL_NUMBER_OF_STUDENTS])
+            organization.maxLevel = int(requestData[Constants.MAX_LEVEL])
+            organization.maxClass = int(requestData[Constants.MAX_CLASS])
+            organization.save()
+
+            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class BulkAddStudents(APIView):
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            role = user.role
+            if role == Constants.SUB_ADMIN:
+                data = request.data
+                students = data['students']
+                batchId = data[Constants.BATCH_ID]
+                requestedNumberOfStudents = len(students)
+                organizationDetails = OrganizationTag.objects.filter(tagId=user.tag_id).first()
+                if (
+                        organizationDetails.totalNumberOfStudents - organizationDetails.numberOfStudents) < requestedNumberOfStudents:
+                    return Response(
+                        {Constants.JSON_MESSAGE: "The account is trying to add more students than the maximum number "
+                                                 "of students it can add. Please contact the administration to "
+                                                 "increase the limit."},
+                        status=status.HTTP_403_FORBIDDEN)
+                existingStudents = []
+                nonExistingStudents = []
+                studentsNotAdded = []
+                errorMessage = ""
+                for i in range(len(students)):
+                    tempUserObject = UserDetails.objects.filter(email=students[i].email)
+                    if tempUserObject is not None:
+                        existingStudents.append(i)
+                        errorMessage += ("The addition of the student with the email ID "
+                                         + str(students[i][Constants.EMAIL])
+                                         + "has not been completed due to an existing account associated with the "
+                                           "same email address. \n")
+                    else:
+                        nonExistingStudents.append(i)
+                for i in nonExistingStudents:
+                    try:
+                        studentData = {
+                            "firstName": students[i][Constants.FIRST_NAME],
+                            "lastName": students[i][Constants.LAST_NAME],
+                            "phoneNumber": students[i][Constants.PHONE_NUMBER],
+                            "emailId": students[i][Constants.EMAIL],
+                            "batchId": batchId
+                        }
+                        createUser(studentData, Student, Constants.STUDENT, organizationDetails)
+                    except Exception as e:
+                        studentsNotAdded.append(i)
+                if len(studentsNotAdded) != 0:
+                    for i in studentsNotAdded:
+                        errorMessage += ("The addition of the student with the email ID "
+                                         + str(students[i][Constants.EMAIL])
+                                         + "Because their might be error with the details provided or else please "
+                                           "contact the administrator")
+
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 def temp():
     print(TopicDetails.objects.filter(levelId=3).values())
-    # print(Batch.objects.all().values())
+    print(OrganizationTag.objects.all().values())
+    # user = UserDetails.objects.filter(userId=120).first()
+    # print(user.tag_id)
+    print(Batch.objects.all().values())
     # print(Curriculum.objects.filter(levelId=1, classId=4).values(), "\n")
     # print(Progress.objects.filter(user_id=2).values())
 

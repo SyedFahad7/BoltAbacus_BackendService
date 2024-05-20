@@ -1,7 +1,21 @@
 from django.db import models
+from django.db.models.functions.datetime import datetime
 
 
 # from django.contrib.auth.models import AbstractBaseUser
+
+
+class OrganizationTag(models.Model):
+    tagId = models.AutoField(primary_key=True)
+    organizationName = models.CharField()
+    tagName = models.CharField(default="BoltAbacus", unique=True)
+    isIndividualTeacher = models.BooleanField(default=False)
+    numberOfTeachers = models.IntegerField(default=0)
+    numberOfStudents = models.IntegerField(default=0)
+    expirationDate = models.DateField(default=datetime.today)
+    totalNumberOfStudents = models.IntegerField(default=0)
+    maxLevel = models.IntegerField(default=1)
+    maxClass = models.IntegerField(default=1)
 
 
 class UserDetails(models.Model):
@@ -14,6 +28,7 @@ class UserDetails(models.Model):
     encryptedPassword = models.CharField()
     created_date = models.DateField()
     blocked = models.BooleanField()
+    tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE, default=1)
 
 
 class TopicDetails(models.Model):
@@ -57,6 +72,7 @@ class Batch(models.Model):
     latestLevelId = models.IntegerField()
     latestClassId = models.IntegerField()
     latestLink = models.CharField()
+    tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE, default=1)
 
 
 class Student(models.Model):

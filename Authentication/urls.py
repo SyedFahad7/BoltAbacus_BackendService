@@ -15,7 +15,7 @@ urlpatterns = [
     path('addQuestion/', views.AddQuestion.as_view()),
     path('getQuestion/', views.GetQuestion.as_view()),
     path('editQuestion/', views.EditQuestion.as_view()),
-    path('getAllQuestions/', views.getAllQuestions.as_view()),
+    path('getAllQuestions/', views.GetAllQuestions.as_view()),
 
     path('addBatch/', views.AddBatch.as_view()),
     path('getAllBatches/', views.GetAllBatches.as_view()),
@@ -38,9 +38,15 @@ urlpatterns = [
     path('getStudentProgress/', views.GetStudentProgress.as_view()),
     path('getStudentProgressStudent/', views.GetStudentProgressFromStudent.as_view()),
     path('bulkAddQuestions/', views.BulkAddQuestions.as_view()),
-    path('forgotPassword/', views.ForgotPassword.as_view())
+    path('forgotPassword/', views.ForgotPassword.as_view()),
     # path('getStudents/', views.GetStudents.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),
+
+    path('addSubAdmin/', views.AddSubAdmin.as_view()),
+    path('addTag/', views.AddOrganizationTagDetails.as_view()),
+    path('getAllTags/', views.GetAllOrganizationTagNames.as_view()),
+    path('getTagDetails/', views.GetOrganizationTagDetails.as_view()),
+    path('updateTagDetails/', views.UpdateOrganizationDetails.as_view())
 
     # path('/token', views.GetCSRFToken.as_view() , name='authentication')
 ]
