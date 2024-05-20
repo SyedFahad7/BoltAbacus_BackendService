@@ -1090,7 +1090,9 @@ class UpdateClass(APIView):
             if teacher is None:
                 return Response({Constants.JSON_MESSAGE: "This User is not the Teacher for this batch."},
                                 status=status.HTTP_403_FORBIDDEN)
+            print("Murali")
             nextLevel, nextClass = getNextClass(latestLevel, latestClass, user.tag_id)
+            print("Pollam")
             if nextClass == -1 or nextLevel == -1:
                 return Response({Constants.JSON_MESSAGE: "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
             if nextClass == -2 or nextLevel == -2:
@@ -1311,7 +1313,7 @@ def getClassIds(levelId):
 
 
 def getNextClass(levelId, classId, tag_id):
-    organizationsDetails = OrganizationTag.objects.filter(tagId=tag_id)
+    organizationsDetails = OrganizationTag.objects.filter(tagId=tag_id).first()
     maxLevelAllowed = organizationsDetails.maxLevel
     maxClassAllowed = organizationsDetails.maxClass
     if classId > 12 or classId < 0:
