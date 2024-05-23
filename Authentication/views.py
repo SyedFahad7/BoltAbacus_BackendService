@@ -1090,9 +1090,7 @@ class UpdateClass(APIView):
             if teacher is None:
                 return Response({Constants.JSON_MESSAGE: "This User is not the Teacher for this batch."},
                                 status=status.HTTP_403_FORBIDDEN)
-            print("Murali")
             nextLevel, nextClass = getNextClass(latestLevel, latestClass, user.tag_id)
-            print("Pollam")
             if nextClass == -1 or nextLevel == -1:
                 return Response({Constants.JSON_MESSAGE: "Max Level and Class"}, status=status.HTTP_403_FORBIDDEN)
             if nextClass == -2 or nextLevel == -2:
@@ -1381,29 +1379,33 @@ class ForgotPassword(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        data = request.data
-        email = data[Constants.EMAIL].lower()
-        user = UserDetails.objects.filter(email=email).first()
-        if user is not None:
+        try:
+            data = request.data
+            email = data[Constants.EMAIL].lower()
+            user = UserDetails.objects.filter(email=email).first()
+            if user is not None:
 
-            organization = OrganizationTag.objects.filter(tagId=user["tag_id"]).first()
-            organizationExpirationDate = organization.expirationDate
-            payload = {
-                Constants.USER_ID: user.userId,
-                Constants.ROLE: user.role,
-                Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
-                "creationTime": str(datetime.datetime.utcnow()),
-                Constants.ORGANIZATION_EXPIRATION_DATE: str(organizationExpirationDate)
+                organization = OrganizationTag.objects.filter(tagId=user.tag_id).first()
+                organizationExpirationDate = organization.expirationDate
+                payload = {
+                    Constants.USER_ID: user.userId,
+                    Constants.ROLE: user.role,
+                    Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
+                    "creationTime": str(datetime.datetime.utcnow()),
+                    Constants.ORGANIZATION_EXPIRATION_DATE: str(organizationExpirationDate)
 
-            }
-            secretKey = Constants.SECRET_KEY
-            loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
-            userName = user.firstName + " " + user.lastName
-            sendLinkEmail(loginToken, userName, email)
-            return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE}, status=status.HTTP_200_OK)
-        else:
-            return Response({Constants.JSON_MESSAGE: "The user doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
+                }
+                secretKey = Constants.SECRET_KEY
+                loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
+                userName = user.firstName + " " + user.lastName
+                sendLinkEmail(loginToken, userName, email)
+                return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE}, status=status.HTTP_200_OK)
+            else:
+                return Response({Constants.JSON_MESSAGE: "The user doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
 
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ResetPasswordV2(APIView):
     permission_classes = [AllowAny]
@@ -1686,7 +1688,8 @@ class BulkAddStudents(APIView):
 
 def temp():
     # print(TopicDetails.objects.filter(levelId=3).values())
-    print(OrganizationTag.objects.all().values())
+    # print(OrganizationTag.objects.all().values())
+    print(UserDetails.objects.filter(email="statravi84@gmail.com").values())
     # user = UserDetails.objects.filter(role=Constants.TEACHER)
     # count=0
     # for i in user:
