@@ -1688,8 +1688,7 @@ class BulkAddStudents(APIView):
 
 def temp():
     # print(TopicDetails.objects.filter(levelId=3).values())
-    # print(OrganizationTag.objects.all().values())
-    print(UserDetails.objects.filter(email="statravi84@gmail.com").values())
+    print(OrganizationTag.objects.all().values())
     # user = UserDetails.objects.filter(role=Constants.TEACHER)
     # count=0
     # for i in user:
