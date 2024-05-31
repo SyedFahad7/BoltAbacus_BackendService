@@ -1622,6 +1622,7 @@ class UpdateOrganizationDetails(APIView):
 
 
 class BulkAddStudents(APIView):
+    permission_classes = [AllowAny]
 
     def post(self, request):
         try:
@@ -1643,42 +1644,56 @@ class BulkAddStudents(APIView):
                 if (
                         organizationDetails.totalNumberOfStudents - organizationDetails.numberOfStudents) < requestedNumberOfStudents:
                     return Response(
-                        {Constants.JSON_MESSAGE: "The account is trying to add more students than the maximum number "
-                                                 "of students it can add. Please contact the administration to "
-                                                 "increase the limit."},
+                        {Constants.JSON_MESSAGE: "Please note that the account is currently exceeding the maximum "
+                                                 "student limit. Kindly contact the administration to discuss "
+                                                 "potential adjustments"},
                         status=status.HTTP_403_FORBIDDEN)
-                existingStudents = []
+                batchList = getBatchList()
+                if batchId not in batchList:
+                    return Response({Constants.JSON_MESSAGE: "Given batch Id is invalid"},
+                                    status=status.HTTP_404_NOT_FOUND)
+                existingStudents = set()
                 nonExistingStudents = []
                 studentsNotAdded = []
-                errorMessage = ""
+                multipleEntries = set()
+                studentEmails = set()
                 for i in range(len(students)):
-                    tempUserObject = UserDetails.objects.filter(email=students[i].email)
+                    studentEmailId = students[i][Constants.EMAIL]
+                    tempUserObject = UserDetails.objects.filter(email=studentEmailId).first()
                     if tempUserObject is not None:
-                        existingStudents.append(i)
-                        errorMessage += ("The addition of the student with the email ID "
-                                         + str(students[i][Constants.EMAIL])
-                                         + "has not been completed due to an existing account associated with the "
-                                           "same email address. \n")
+                        existingStudents.add(studentEmailId)
                     else:
-                        nonExistingStudents.append(i)
+                        if studentEmailId not in studentEmails:
+                            nonExistingStudents.append(i)
+                            studentEmails.add(studentEmailId)
+                        else:
+                            multipleEntries.add(studentEmailId)
                 for i in nonExistingStudents:
                     try:
                         studentData = {
-                            "firstName": students[i][Constants.FIRST_NAME],
-                            "lastName": students[i][Constants.LAST_NAME],
-                            "phoneNumber": students[i][Constants.PHONE_NUMBER],
-                            "emailId": students[i][Constants.EMAIL],
-                            "batchId": batchId
+                            Constants.FIRST_NAME: students[i][Constants.FIRST_NAME],
+                            Constants.LAST_NAME: students[i][Constants.LAST_NAME],
+                            Constants.PHONE_NUMBER: students[i][Constants.PHONE_NUMBER],
+                            Constants.EMAIL: students[i][Constants.EMAIL],
+                            Constants.BATCH_ID: batchId
                         }
-                        createUser(studentData, Student, Constants.STUDENT, organizationDetails)
+                        studentResponse = createUser(studentData, Student, Constants.STUDENT, organizationDetails)
+                        if studentResponse.status_code != 200:
+                            studentsNotAdded.append(students[i][Constants.EMAIL])
                     except Exception as e:
-                        studentsNotAdded.append(i)
-                if len(studentsNotAdded) != 0:
-                    for i in studentsNotAdded:
-                        errorMessage += ("The addition of the student with the email ID "
-                                         + str(students[i][Constants.EMAIL])
-                                         + "Because their might be error with the details provided or else please "
-                                           "contact the administrator")
+                        studentsNotAdded.append(students[i][Constants.EMAIL])
+
+                if len(students) == len(nonExistingStudents):
+                    return Response({Constants.JSON_MESSAGE: "All the students have been successfully added."},
+                                    status=status.HTTP_200_OK)
+                else:
+                    return Response(
+                        {Constants.JSON_MESSAGE: "Partial Success",
+                         "NumberOfStudentsAdded": len(nonExistingStudents),
+                         "ExistingStudents": list(existingStudents),
+                         "UndefinedError": studentsNotAdded,
+                         "MultipleEntries": list(multipleEntries)},
+                        status=status.HTTP_206_PARTIAL_CONTENT)
 
             else:
                 return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
