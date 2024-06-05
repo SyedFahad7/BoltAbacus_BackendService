@@ -724,6 +724,24 @@ class GetTeachers(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetTeachersV2(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            teacherDetails = UserDetails.objects.filter(role=Constants.TEACHER)
+            teachers = []
+            for teacher in teacherDetails:
+                organization = OrganizationTag.objects.filter(tag_id=teacher.tag_id).first()
+                teachers.append({Constants.USER_ID: teacher.userId,
+                                 Constants.FIRST_NAME: teacher.firstName,
+                                 Constants.LAST_NAME: teacher.lastName,
+                                 Constants.TAG: organization.tagName})
+            return Response({"teachers": teachers}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # class AssignBatch(APIView):
 #     permission_classes = [AllowAny]
 #
