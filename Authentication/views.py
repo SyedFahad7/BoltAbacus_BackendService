@@ -732,7 +732,7 @@ class GetTeachersV2(APIView):
             teacherDetails = UserDetails.objects.filter(role=Constants.TEACHER)
             teachers = []
             for teacher in teacherDetails:
-                organization = OrganizationTag.objects.filter(tag_id=teacher.tag_id).first()
+                organization = OrganizationTag.objects.filter(tagId=teacher.tag_id).first()
                 teachers.append({Constants.USER_ID: teacher.userId,
                                  Constants.FIRST_NAME: teacher.firstName,
                                  Constants.LAST_NAME: teacher.lastName,
