@@ -526,7 +526,8 @@ class GetAllBatches(APIView):
             batchIds = []
             for batchId in batchIdDetails:
                 batchIds.append(
-                    {Constants.BATCH_ID: batchId[Constants.BATCH_ID], Constants.BATCH_NAME: batchId[Constants.BATCH_NAME],
+                    {Constants.BATCH_ID: batchId[Constants.BATCH_ID],
+                     Constants.BATCH_NAME: batchId[Constants.BATCH_NAME],
                      "timeDay": batchId['timeDay'],
                      "timeSchedule": batchId['timeSchedule'], "numberOfStudents": batchId['numberOfStudents'],
                      "active": batchId['active'], Constants.LATEST_LEVEL_ID: batchId[Constants.LATEST_LEVEL_ID],
@@ -549,7 +550,8 @@ class AddBatch(APIView):
             teacherUserId = data[Constants.USER_ID]
             user = UserDetails.objects.filter(userId=teacherUserId).first()
             if user.role != Constants.TEACHER:
-                return Response({Constants.JSON_MESSAGE: "Given User is not a Teacher"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({Constants.JSON_MESSAGE: "Given User is not a Teacher"},
+                                status=status.HTTP_403_FORBIDDEN)
             else:
                 newBatch = Batch.objects.create(
                     timeDay=timeDay,
@@ -742,7 +744,50 @@ class GetTeachersV2(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# class AssignBatch(APIView):
+class GetStudentByName(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            studentName = request.data["name"]
+            if user.role != Constants.ADMIN or user.role == Constants.SUB_ADMIN:
+                return Response({Constants.JSON_MESSAGE: "User is not an Admin."}, status=status.HTTP_401_UNAUTHORIZED)
+            if user.role == Constants.ADMIN:
+                print("murali")
+                students = UserDetails.objects.filter(firstName__istartswith=studentName) | UserDetails.objects.filter(
+                    lastName__istartswith=studentName)
+            else:
+                students = UserDetails.objects.filter(firstName__istartswith=studentName,
+                                                      tag_id=user.tag_id) | UserDetails.objects.filter(
+                    lastName__istartswith=studentName, tag_id=user.tag_id)
+            studentsDetails = []
+            for student in students:
+                if student.role == Constants.STUDENT:
+                    tagName = getTagName(student.tag_id)
+                    studentsDetails.append({
+                        Constants.USER_ID: student.userId,
+                        Constants.FIRST_NAME: student.firstName,
+                        Constants.LAST_NAME: student.lastName,
+                        Constants.PHONE_NUMBER: student.phoneNumber,
+                        Constants.EMAIL: student.email,
+                        Constants.TAG: tagName
+                    })
+            return Response({"students": studentsDetails}, status=status.HTTP_200_OK )
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return
+    # class AssignBatch(APIView):
+
+
 #     permission_classes = [AllowAny]
 #
 #     def post(self, request):
@@ -1380,7 +1425,6 @@ class BulkAddQuestions(APIView):
             quizId = curriculumDetails.quizId
             QuizQuestions.objects.filter(quiz_id=quizId).delete()
             for questionIndex in questions:
-
                 questionJson = questionIndex[Constants.QUESTION]
                 correctAnswer = questionIndex[Constants.CORRECT_ANSWER]
                 questionString = json.dumps(questionJson)
@@ -1424,6 +1468,7 @@ class ForgotPassword(APIView):
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class ResetPasswordV2(APIView):
     permission_classes = [AllowAny]
@@ -1717,6 +1762,11 @@ class BulkAddStudents(APIView):
                 return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def getTagName(tagId):
+    organization = OrganizationTag.objects.filter(tagId=tagId).first()
+    return organization.tagName
 
 
 def temp():
