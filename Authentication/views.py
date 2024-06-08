@@ -758,7 +758,7 @@ class GetStudentByName(APIView):
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
             studentName = request.data["name"]
-            if user.role != Constants.ADMIN or user.role == Constants.SUB_ADMIN:
+            if user.role != Constants.ADMIN or user.role != Constants.SUB_ADMIN:
                 return Response({Constants.JSON_MESSAGE: "User is not an Admin."}, status=status.HTTP_401_UNAUTHORIZED)
             if user.role == Constants.ADMIN:
                 print("murali")
