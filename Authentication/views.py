@@ -786,7 +786,7 @@ class GetStudentByName(APIView):
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return
+
     # class AssignBatch(APIView):
 
 
@@ -1126,7 +1126,7 @@ class GetTeacherBatches(APIView):
                 batchId = teacherBatch.batchId
                 batch = Batch.objects.filter(batchId=batchId).first()
                 batches[batch.timeDay].append(
-                    {Constants.BATCH_ID: batch.batchId, Constants.BATCH_NAME: batch.batchName,
+                    {Constants.BATCH_ID: batch.batchId, Constants.BATCH_NAME: batch.batchName, Constants.LATEST_LEVEL_ID: batch.latestLevelId, Constants.LATEST_CLASS_ID: batch.latestClassId,
                      "timings": batch.timeSchedule})
             return Response({"batches": batches})
         except Exception as e:
