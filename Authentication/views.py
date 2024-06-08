@@ -771,13 +771,16 @@ class GetStudentByName(APIView):
             for student in students:
                 if student.role == Constants.STUDENT:
                     tagName = getTagName(student.tag_id)
+                    studentModel = Student.objects.filter(user_id=student.userId).first()
+                    studentBatch = Batch.objects.filter(batchId=studentModel.batch_id).first()
                     studentsDetails.append({
                         Constants.USER_ID: student.userId,
                         Constants.FIRST_NAME: student.firstName,
                         Constants.LAST_NAME: student.lastName,
                         Constants.PHONE_NUMBER: student.phoneNumber,
                         Constants.EMAIL: student.email,
-                        Constants.TAG: tagName
+                        Constants.TAG: tagName,
+                        Constants.BATCH_NAME: studentBatch.batchName
                     })
             return Response({"students": studentsDetails}, status=status.HTTP_200_OK )
         except Exception as e:
@@ -869,7 +872,9 @@ class GetStudents(APIView):
                 student = UserDetails.objects.filter(userId=i).first()
                 students.append({Constants.USER_ID: student.userId,
                                  Constants.FIRST_NAME: student.firstName,
-                                 Constants.LAST_NAME: student.lastName})
+                                 Constants.LAST_NAME: student.lastName,
+                                 Constants.PHONE_NUMBER: student.phoneNumber,
+                                 Constants.EMAIL: student.email})
             return Response({"students": students}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
