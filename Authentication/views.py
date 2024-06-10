@@ -787,7 +787,48 @@ class GetStudentByName(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-    # class AssignBatch(APIView):
+class GetStudentByNameV2(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            studentName = request.data["name"]
+            if user.role != Constants.TEACHER:
+                return Response({Constants.JSON_MESSAGE: "User is not a Teacher."}, status=status.HTTP_401_UNAUTHORIZED)
+            batchStudentIds = getTeacherStudents(userId)
+            studentsDetails = []
+            tagName = getTagName(user.tag_id)
+            for batchId in batchStudentIds:
+                studentBatch = Batch.objects.filter(batchId=batchId).first()
+                batchName = studentBatch.batchName
+                for studentId in batchStudentIds[batchId]:
+                    studentDetails = UserDetails.objects.filter(firstName__istartswith=studentName,
+                                                                userId=studentId).first()
+                    if studentDetails is not None:
+                        studentsDetails.append({
+                            Constants.USER_ID: studentDetails.userId,
+                            Constants.FIRST_NAME: studentDetails.firstName,
+                            Constants.LAST_NAME: studentDetails.lastName,
+                            Constants.PHONE_NUMBER: studentDetails.phoneNumber,
+                            Constants.EMAIL: studentDetails.email,
+                            Constants.TAG: tagName,
+                            Constants.BATCH_NAME: batchName
+                        })
+
+            return Response({"students": studentsDetails}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# class AssignBatch(APIView):
 
 
 #     permission_classes = [AllowAny]
@@ -904,12 +945,17 @@ class GetTopicsData(APIView):
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def getTeacherStudents(TeacherUserId):
+    teacherBatchIds = list(Teacher.objects.filter(user_id=TeacherUserId).values_list("batchId", flat=True))
+    students = {}
+    for batchId in teacherBatchIds:
+        students[batchId] = getStudentIds(batchId)
+    return students
+
+
 def getStudentIds(batchId):
-    studentIdDetails = Student.objects.filter(batch_id=batchId).values("user_id")
-    studentIds = []
-    for studentId in studentIdDetails:
-        studentIds.append(studentId['user_id'])
-    return studentIds
+    studentIdDetails = Student.objects.filter(batch_id=batchId).values_list("user_id", flat=True)
+    return list(studentIdDetails)
 
 
 def getBatchList():

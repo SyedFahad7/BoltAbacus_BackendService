@@ -42,6 +42,7 @@ urlpatterns = [
     path('forgotPassword/', views.ForgotPassword.as_view()),
     path('getStudents/', views.GetStudents.as_view()),
     path('getStudentsByName/', views.GetStudentByName.as_view()),
+    path('getStudentByNameV2/', views.GetStudentByNameV2.as_view()),
     # path('assignStudentToBatch/', views.AssignStudentToBatch.as_view()),
 
     path('addSubAdmin/', views.AddSubAdmin.as_view()),
