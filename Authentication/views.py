@@ -367,7 +367,7 @@ def sendEmail(verdictList, levelId, classId, topicId, quizType, result, emailId,
         ('Report of level ' + str(levelId) + ', class ' + str(classId) + ', topic ' + str(topicId) + ' ' + quizType),
         template,
         'boltabacus.dev@gmail.com',
-        [emailId, 'boltabacus.dev@gmail.com']
+        [emailId]
     )
     email.content_subtype = 'html'
     result = email.send()
@@ -688,7 +688,7 @@ class AddTeacher(APIView):
                     'Account has been Created',
                     "An account has been created for this email id for the teacher role. The password is " + password + ". Please login and change your password",
                     'boltabacus.dev@gmail.com',
-                    [email, 'boltabacus.dev@gmail.com']
+                    [email]
                 )
                 email.send()
 
@@ -1027,7 +1027,7 @@ def createUser(data, dbObject, role, organizationTag):
                 'Account has been Created',
                 "An account has been created for this emailId id for the student role. The password is " + password + ". Please login and change your password",
                 'boltabacus.dev@gmail.com',
-                [emailId, 'boltabacus.dev@gmail.com']
+                [emailId]
             )
             email.send()
             return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE},
@@ -1609,7 +1609,7 @@ class AddSubAdmin(APIView):
                 'Account has been Created',
                 "An account has been created for this email id for the sub-Admin role. The password is " + password + ". Please login and change your password",
                 'boltabacus.dev@gmail.com',
-                [email, 'boltabacus.dev@gmail.com']
+                [email]
             )
             email.send()
 
