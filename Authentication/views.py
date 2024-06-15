@@ -366,7 +366,7 @@ def sendEmail(verdictList, levelId, classId, topicId, quizType, result, emailId,
     email = EmailMessage(
         ('Report of level ' + str(levelId) + ', class ' + str(classId) + ', topic ' + str(topicId) + ' ' + quizType),
         template,
-        'boltabacus.dev@gmail.com',
+        'sankeerth@boltabacus.com',
         [emailId]
     )
     email.content_subtype = 'html'
@@ -687,7 +687,7 @@ class AddTeacher(APIView):
                 email = EmailMessage(
                     'Account has been Created',
                     "An account has been created for this email id for the teacher role. The password is " + password + ". Please login and change your password",
-                    'boltabacus.dev@gmail.com',
+                    'sankeerth@boltabacus.com',
                     [email]
                 )
                 email.send()
@@ -1026,7 +1026,7 @@ def createUser(data, dbObject, role, organizationTag):
             email = EmailMessage(
                 'Account has been Created',
                 "An account has been created for this emailId id for the student role. The password is " + password + ". Please login and change your password",
-                'boltabacus.dev@gmail.com',
+                'sankeerth@boltabacus.com',
                 [emailId]
             )
             email.send()
@@ -1567,7 +1567,7 @@ def sendLinkEmail(token, userName, emailId):
     email = EmailMessage(
         "Link To change your Password",
         template,
-        'boltabacus.dev@gmail.com',
+        'sankeerth@boltabacus.com',
         [emailId]
     )
     email.content_subtype = 'html'
@@ -1608,7 +1608,7 @@ class AddSubAdmin(APIView):
             email = EmailMessage(
                 'Account has been Created',
                 "An account has been created for this email id for the sub-Admin role. The password is " + password + ". Please login and change your password",
-                'boltabacus.dev@gmail.com',
+                'sankeerth@boltabacus.com',
                 [email]
             )
             email.send()
