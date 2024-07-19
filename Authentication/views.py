@@ -793,28 +793,30 @@ class GetStudentByNameV2(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# class AssignBatch(APIView):
+class UpdateBatchTeacher(APIView):
 
 
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#         try:
-#             data = request.data
-#             teacherId = data[Constants.USER_ID]
-#             teacher = UserDetails.objects.filter(userId=teacherId).first()
-#             if teacher:
-#                 if teacher.role == Constants.TEACHER:
-#                     batchId = data[Constants.BATCH_ID]
-#                     return assignUserToBatch(Teacher, batchId, teacherId, Constants.TEACHER)
-#                 else:
-#                     return Response({Constants.JSON_MESSAGE: "Given user is not a teacher"},
-#                                     status=status.HTTP_403_FORBIDDEN)
-#             else:
-#                 return Response({Constants.JSON_MESSAGE: "Given user doesn't exist"},
-#                                 status=status.HTTP_403_FORBIDDEN)
-#         except Exception as e:
-#             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            currentTeacherId = data[Constants.CURRENT_TEACHER_ID]
+            futureTeacherId = data[Constants.FUTURE_TEACHER_ID]
+            currentTeacher = UserDetails.objects.filter(userId=currentTeacherId).first()
+            futureTeacher = UserDetails.objects.filter(userId=futureTeacherId).first()
+            if currentTeacher and futureTeacherId:
+                if currentTeacher.role == Constants.TEACHER and futureTeacher.role == Constants.TEACHER:
+                    batchId = data[Constants.BATCH_ID]
+                    return assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId)
+                else:
+                    return Response({Constants.JSON_MESSAGE: "Given user is not a teacher"},
+                                    status=status.HTTP_403_FORBIDDEN)
+            else:
+                return Response({Constants.JSON_MESSAGE: "Given user doesn't exist"},
+                                status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # class AssignStudentToBatch(APIView):
@@ -928,7 +930,7 @@ def getBatchList():
     batchIds = []
     for batchId in batchIdDetails:
         batchIds.append(batchId[Constants.BATCH_ID])
-    return batchIds
+    return set(batchIds)
 
 
 def createUser(data, dbObject, role, organizationTag):
@@ -1005,30 +1007,24 @@ def createUser(data, dbObject, role, organizationTag):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# def assignUserToBatch(dbObject, batchId, userId, role):
-#     batchList = getBatchList()
-#     if batchId in batchList:
-#         try:
-#             dbObjectInstance = dbObject.objects.filter(
-#                 user_id=userId
-#             ).first()
-#             if role == Constants.TEACHER:
-#                 previousBatchId = dbObjectInstance.batchId
-#                 dbObjectInstance.batchId = batchId
-#             else:
-#                 previousBatchId = dbObjectInstance.batch_id
-#                 dbObjectInstance.batch_id = batchId
-#             dbObjectInstance.save()
-#             if role == Constants.STUDENT:
-#                 addProgressIfNeeded(previousBatchId, batchId, userId)
-#             return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE},
-#                             status=status.HTTP_200_OK)
-#         except Exception as e:
-#             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-#     else:
-#
-#         return Response({Constants.JSON_MESSAGE: "Given batch Id is invalid"},
-#                         status=status.HTTP_403_FORBIDDEN)
+def assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId):
+    batchList = getBatchList()
+    if batchId in batchList:
+        try:
+            teacher = Teacher.objects.filter(user_id=currentTeacherId, batchId=batchId).first()
+            if teacher:
+                teacher.delete()
+            Teacher.objects.create(
+                user_id = futureTeacherId,
+                batchId = batchId
+            )
+            return Response({Constants.JSON_MESSAGE: "Teacher has been reassigned successfully"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    else:
+
+        return Response({Constants.JSON_MESSAGE: "Given batch Id is invalid"},
+                        status=status.HTTP_403_FORBIDDEN)
 #
 #
 # def addProgressIfNeeded(previousBatchId, currentBatchId, userId):
@@ -1775,6 +1771,38 @@ class BulkAddStudents(APIView):
 
             else:
                 return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+class GetBatchTeacher(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        try:
+
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            role = user.role
+            if role == Constants.SUB_ADMIN:
+                data = request.data
+                batchId = data[Constants.BATCH_ID]
+                teacherDeatils = []
+                teachers = Teacher.objects.filter(batchId=batchId)
+                for teacher in teachers:
+                    user = UserDetails.objects.filter(userId=teacher.user_id).first()
+                    teacherDeatils.append({Constants.FIRST_NAME: user.firstName, Constants.LAST_NAME: user.lastName,Constants.USER_ID: user.userId})
+                return Response({"teachers": teacherDeatils}, status=status.HTTP_200_OK)
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+                
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

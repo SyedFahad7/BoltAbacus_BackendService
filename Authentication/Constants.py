@@ -55,3 +55,6 @@ EXPIRATION_DATE = "expirationDate"
 TOTAL_NUMBER_OF_STUDENTS = "totalNumberOfStudents"
 MAX_LEVEL = "maxLevel"
 MAX_CLASS = "maxClass"
+
+FUTURE_TEACHER_ID = "futureTeacherId"
+CURRENT_TEACHER_ID = "currentTeacherId"
