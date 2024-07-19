@@ -4,6 +4,7 @@ from django.urls import path, include
 urlpatterns = [
     path('login/', views.SignIn.as_view()),
     path('levels/', views.CurrentLevels.as_view()),
+    path('levelsV2/', views.CurrentLevelsV2.as_view()),
     path('classes/', views.TopicsData.as_view()),
     path('classesV2/', views.ClassProgress.as_view()),
     path('quiz/', views.QuizQuestionsData.as_view()),

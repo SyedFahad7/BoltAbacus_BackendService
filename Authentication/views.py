@@ -110,9 +110,24 @@ class CurrentLevelsV2(APIView):
             latestLevel = userBatchDetails.latestLevelId
             latestLink = userBatch.latestLink
             latestClass = userBatchDetails.latestClassId
-            return Response({Constants.LEVEL_ID: latestLevel, Constants.LATEST_CLASS: latestClass,
-                             Constants.LATEST_LINK: latestLink},
-                            status=status.HTTP_200_OK)
+            levelsPercentage = {}
+            for level in range(1,latestLevel+1):
+                latestClassId = 12
+                topicCount = 0
+                numberOfTopicsPassed = 0
+                for currentClassId in range(1, latestClassId + 1):
+                        curriculumDetails = Curriculum.objects.filter(levelId=level, classId=currentClassId)
+                        if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
+                            for quiz in curriculumDetails:
+                                topicCount += 1
+                                quizId = quiz.quizId
+                                progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).first()
+                                if progress.quizPass:
+                                    numberOfTopicsPassed += 1
+                        else:
+                            topicCount+=len(curriculumDetails)
+                levelsPercentage.update({level: (int((numberOfTopicsPassed / topicCount) * 100))}) 
+            return Response({"levelsPercentage": levelsPercentage}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -227,10 +242,8 @@ class QuizQuestionsData(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
-            userBatchId = userBatchDetails.batch_id
-            userBatch = Batch.objects.filter(batchId=userBatchId).first()
-            latestLevel = userBatch.latestLevelId
-            latestClass = userBatch.latestClassId
+            latestLevel = userBatchDetails.latestLevelId
+            latestClass = userBatchDetails.latestClassId
 
             data = request.data
             requestLevelId = data[Constants.LEVEL_ID]
@@ -334,11 +347,9 @@ class ReportDetails(APIView):
             data = request.data
             requestLevelId = data[Constants.LEVEL_ID]
             requestClassId = data[Constants.CLASS_ID]
-            userBatchDetails = Student.objects.filter(user=requestUserId).values().first()
-            userBatchId = userBatchDetails['batch_id']
-            userBatch = Batch.objects.filter(batchId=userBatchId).values().first()
-            latestLevel = userBatch[Constants.LATEST_LEVEL_ID]
-            latestClass = userBatch[Constants.LATEST_CLASS_ID]
+            userBatchDetails = Student.objects.filter(user=requestUserId).first()
+            latestLevel = userBatchDetails.latestLevelId
+            latestClass = userBatchDetails.latestClassId
             if requestLevelId > latestLevel or (requestClassId > latestClass and requestLevelId == latestLevel):
                 return Response({Constants.JSON_MESSAGE: "Report not accessible."}, status=status.HTTP_403_FORBIDDEN)
             classQuizDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=requestClassId)
@@ -928,7 +939,7 @@ class AddStudent(APIView):
                 return Response({Constants.JSON_MESSAGE: "The account has reached maximum student it can add. Please "
                                                          "contact the administration to increase the limit."},
                                 status=status.HTTP_403_FORBIDDEN)
-            return createUser(request.data, Student, Constants.STUDENT, organizationDetails)
+            return CreateStudentUser(request.data, organizationDetails)
         else:
             return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -999,7 +1010,7 @@ def getBatchList():
     return set(batchIds)
 
 
-def createUser(data, dbObject, role, organizationTag):
+def CreateStudentUser(data, organizationTag):
     try:
 
         firstName = data[Constants.FIRST_NAME]
@@ -1021,7 +1032,7 @@ def createUser(data, dbObject, role, organizationTag):
                 lastName=lastName,
                 phoneNumber=phoneNumber,
                 email=emailId,
-                role=role,
+                role=Constants.STUDENT,
                 encryptedPassword=encryptPassword(password),
                 created_date=datetime.datetime.now(),
                 blocked=False,
@@ -1029,32 +1040,33 @@ def createUser(data, dbObject, role, organizationTag):
             )
             user.save()
 
-            roleRelatedObject = dbObject.objects.create(
+            batchDetails = Batch.objects.filter(batchId=batchId).first()
+            latestLevel = batchDetails.latestLevelId
+            latestClass = batchDetails.latestClassId
+            studentUser = Student.objects.create(
                 user=user,
-                batch_id=batchId
+                batch_id=batchId,
+                latestLevelId = latestLevel,
+                latestClassId = latestClass
             )
-            roleRelatedObject.save()
+            studentUser.save()
             organizationTag.numberOfStudents += 1
             organizationTag.save()
-            if role == Constants.STUDENT:
-                batchDetails = Batch.objects.filter(batchId=batchId).first()
-                latestLevel = batchDetails.latestLevelId
-                latestClass = batchDetails.latestClassId
-                for i in range(latestLevel + 1):
-                    classes = getClassIds(i)
-                    for j in classes:
-                        curriculum = Curriculum.objects.filter(levelId=i, classId=j)
-                        for quiz in curriculum:
-                            if (quiz.levelId < latestLevel) or (quiz.classId <= latestClass and
-                                                                quiz.levelId == latestLevel):
-                                progress = Progress.objects.create(
-                                    quiz_id=quiz.quizId,
-                                    user_id=user.userId
-                                )
-                                progress.save()
+            for i in range(latestLevel + 1):
+                classes = getClassIds(i)
+                for j in classes:
+                    curriculum = Curriculum.objects.filter(levelId=i, classId=j)
+                    for quiz in curriculum:
+                        if (quiz.levelId < latestLevel) or (quiz.classId <= latestClass and
+                                                            quiz.levelId == latestLevel):
+                            progress = Progress.objects.create(
+                                quiz_id=quiz.quizId,
+                                user_id=user.userId
+                            )
+                            progress.save()
 
-                            else:
-                                break
+                        else:
+                            break
 
             email = EmailMessage(
                 'Account has been Created',
@@ -1260,11 +1272,21 @@ class UpdateClass(APIView):
             batch.latestClassId = nextClass
             batch.latestLevelId = nextLevel
             batch.save()
+            updateStudentLatestClass(nextLevel, nextClass, batch.batchId)
             return Response({Constants.JSON_MESSAGE: Constants.SUCCESS_MESSAGE, "level": nextLevel, "class": nextClass},
                             status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+def updateStudentLatestClass(latestLevelId, latestClassId, batchId):
+    studentsDetails = Student.objects.filter(batch_id = batchId)
+    for student in  studentsDetails:
+        student.latestLevelId = latestLevelId
+        student.latestClassId = latestClassId
+        student.save()
+    return 
 
 
 class GetClassReport(APIView):
@@ -1817,7 +1839,7 @@ class BulkAddStudents(APIView):
                             Constants.EMAIL: students[i][Constants.EMAIL],
                             Constants.BATCH_ID: batchId
                         }
-                        studentResponse = createUser(studentData, Student, Constants.STUDENT, organizationDetails)
+                        studentResponse = CreateStudentUser(studentData, organizationDetails)
                         if studentResponse.status_code != 200:
                             studentsNotAdded.append(students[i][Constants.EMAIL])
                     except Exception as e:
