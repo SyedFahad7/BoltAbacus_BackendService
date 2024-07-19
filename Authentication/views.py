@@ -246,17 +246,6 @@ class QuizCorrection(APIView):
                 progress.percentage = percentage
                 progress.save()
 
-                sendEmail(verdictList,
-                          curriculum.levelId,
-                          curriculum.classId,
-                          curriculum.topicId,
-                          curriculum.quizType,
-                          isPass,
-                          user.email,
-                          percentage,
-                          secondsToMinutes(requestQuizTime),
-                          requestScore)
-
                 return Response({"results": verdictList, "pass": isPass, Constants.TIME: requestQuizTime})
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -348,30 +337,6 @@ def secondsToMinutes(time):
     minutes = time // 60
     seconds = time % 60
     return str(minutes) + " minutes and " + str(seconds) + " seconds"
-
-
-def sendEmail(verdictList, levelId, classId, topicId, quizType, result, emailId, percentage, time, score):
-    content = {
-        Constants.LEVEL_ID: levelId,
-        Constants.CLASS_ID: classId,
-        Constants.TOPIC_ID: topicId,
-        Constants.QUIZ_TYPE: quizType,
-        'verdictList': verdictList,
-        'result': result,
-        Constants.TIME: time,
-        Constants.PERCENTAGE: percentage,
-        'score': score
-    }
-    template = loader.get_template('EmailTemplate.html').render(content)
-    email = EmailMessage(
-        ('Report of level ' + str(levelId) + ', class ' + str(classId) + ', topic ' + str(topicId) + ' ' + quizType),
-        template,
-        'sankeerth@boltabacus.com',
-        [emailId]
-    )
-    email.content_subtype = 'html'
-    result = email.send()
-    return result
 
 
 def IdExtraction(token):
