@@ -5,6 +5,7 @@ urlpatterns = [
     path('login/', views.SignIn.as_view()),
     path('levels/', views.CurrentLevels.as_view()),
     path('classes/', views.TopicsData.as_view()),
+    path('classesV2/', views.ClassProgress.as_view()),
     path('quiz/', views.QuizQuestionsData.as_view()),
     path('quizCorrection/', views.QuizCorrection.as_view()),
     path('report/', views.ReportDetails.as_view()),

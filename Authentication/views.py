@@ -91,6 +91,72 @@ class CurrentLevels(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
+class CurrentLevelsV2(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            userBatchDetails = Student.objects.filter(user=requestUserId).first()
+            userBatchId = userBatchDetails.batch_id
+            userBatch = Batch.objects.filter(batchId=userBatchId).first()
+            latestLevel = userBatchDetails.latestLevelId
+            latestLink = userBatch.latestLink
+            latestClass = userBatchDetails.latestClassId
+            return Response({Constants.LEVEL_ID: latestLevel, Constants.LATEST_CLASS: latestClass,
+                             Constants.LATEST_LINK: latestLink},
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+
+class ClassProgress(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            data = request.data
+            requestLevelId = data[Constants.LEVEL_ID]
+            try:
+                requestUserId = IdExtraction(requestUserToken)
+                if isinstance(requestUserId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            userBatchDetails = Student.objects.filter(user=requestUserId).first()
+            latestLevel = userBatchDetails.latestLevelId
+            latestClass = userBatchDetails.latestClassId
+            progressData = []
+            if requestLevelId <= 0 or requestLevelId > 10 or latestLevel > requestLevelId:
+                return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
+            elif latestLevel >= requestLevelId:
+                for currentClassId in range(1, latestClass + 1):
+                    curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=currentClassId)
+                    classProgress = []
+                    for quiz in curriculumDetails:
+                        quizId = quiz.quizId
+                        progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).first()
+                        classProgress.append(
+                            {Constants.TOPIC_ID: quiz.topicId,
+                            'QuizType': quiz.quizType,
+                            Constants.PERCENTAGE: progress.percentage,
+                            Constants.TIME: progress.time})
+                    progressData.append({Constants.CLASS_ID: currentClassId, "classProgress": classProgress})
+                return Response({Constants.PROGRESS: progressData}, status=status.HTTP_200_OK)
+            else:
+                return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class TopicsData(APIView):
     permission_classes = [AllowAny]
 

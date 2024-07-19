@@ -78,6 +78,8 @@ class Batch(models.Model):
 class Student(models.Model):
     user = models.OneToOneField(UserDetails, to_field='userId', on_delete=models.CASCADE)
     batch = models.ForeignKey(Batch, to_field='batchId', on_delete=models.DO_NOTHING)
+    latestLevelId = models.IntegerField(default=1)
+    latestClassId = models.IntegerField(default=1)
 
 
 class Teacher(models.Model):
