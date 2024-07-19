@@ -127,7 +127,10 @@ class CurrentLevelsV2(APIView):
                         else:
                             topicCount+=len(curriculumDetails)
                 levelsPercentage.update({level: (int((numberOfTopicsPassed / topicCount) * 100))}) 
-            return Response({"levelsPercentage": levelsPercentage}, status=status.HTTP_200_OK)
+            return Response({"levelsPercentage": levelsPercentage,
+                             Constants.LEVEL_ID: latestLevel, 
+                             Constants.LATEST_CLASS: latestClass,
+                             Constants.LATEST_LINK: latestLink}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
