@@ -899,29 +899,83 @@ class UpdateBatchTeacher(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# class AssignStudentToBatch(APIView):
-#     permission_classes = [AllowAny]
-#
-#     def post(self, request):
-#         try:
-#             data = request.data
-#             studentId = data[Constants.USER_ID]
-#             student = UserDetails.objects.filter(userId=studentId).first()
-#             if student:
-#                 if student.role == Constants.STUDENT:
-#                     batchId = data[Constants.BATCH_ID]
-#                     return assignUserToBatch(Student, batchId, studentId, Constants.STUDENT)
-#                 else:
-#                     return Response({Constants.JSON_MESSAGE: "Given user is not a Student"},
-#                                     status=status.HTTP_403_FORBIDDEN)
-#
-#             else:
-#                 return Response({Constants.JSON_MESSAGE: "Given user doesn't exist"},
-#                                 status=status.HTTP_403_FORBIDDEN)
-#
-#             pass
-#         except Exception as e:
-#             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+class UpdateStudentBatch(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            userDeatils = UserDetails.objects.filter(userId=userId).first()
+            
+            if userDeatils.role == Constants.ADMIN or userDeatils.role == Constants.SUB_ADMIN:
+                data = request.data
+                studentId = data[Constants.USER_ID]
+                student = UserDetails.objects.filter(userId=studentId).first()
+
+                if student:
+                    if student.role == Constants.STUDENT:
+                        if userDeatils.role == Constants.SUB_ADMIN and (student.tag_id != userDeatils.tag_id):
+                            return Response({Constants.JSON_MESSAGE: "You cannot delete the account, please contact the administration"}, 
+                                        status=status.HTTP_403_FORBIDDEN)
+
+                        batchId = data[Constants.BATCH_ID]
+                        studentBatchDetails = Student.objects.filter(user_id = studentId).first()
+                        if batchId == studentBatchDetails.batch_id:
+                            return Response({Constants.JSON_MESSAGE: "Student already belongs to this Batch"}, status=status.HTTP_409_CONFLICT)
+                        
+                        studentBatchDetails.batch_id = batchId
+                        studentBatchDetails.save()
+                        addProgressIfNeeded(batchId, studentId)
+                        
+                        return Response({Constants.JSON_MESSAGE: "Student has been reassigned successfully"}, status=status.HTTP_200_OK)
+
+                    else:
+                        return Response({Constants.JSON_MESSAGE: "Given user is not a Student"},
+                                        status=status.HTTP_403_FORBIDDEN)
+
+                else:
+                    return Response({Constants.JSON_MESSAGE: "Given user doesn't exist"},
+                                    status=status.HTTP_403_FORBIDDEN)
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+            pass
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def addProgressIfNeeded( currentBatchId, userId):
+    studentDeatils = Student.objects.filter(user_id=userId).first()
+    currentBatch = Batch.objects.filter(batchId=currentBatchId).first()
+    previousLatestLevel = studentDeatils.latestLevelId
+    currentLatestLevel = currentBatch.latestLevelId
+    previousLatestClass = studentDeatils.latestClassId
+    currentLatestClass = currentBatch.latestClassId
+    if ((currentLatestLevel > previousLatestLevel) or
+            (currentLatestLevel == previousLatestLevel and previousLatestClass < currentLatestClass)):
+        studentDeatils.latestLevelId = currentLatestLevel
+        studentDeatils.latestClassId = currentLatestClass
+        studentDeatils.save()
+        for i in range(previousLatestLevel, currentLatestLevel +1):
+            curriculum = Curriculum.objects.filter(levelId=i)
+            for quiz in curriculum:
+                if ((quiz.levelId < currentLatestLevel) or
+                        (quiz.classId <= currentLatestClass and
+                         quiz.levelId == currentLatestLevel)):
+                    if not Progress.objects.filter(quiz_id=quiz.quizId, user_id=userId).first():
+                        progress = Progress.objects.create(
+                            quiz_id=quiz.quizId,
+                            user_id=userId
+                        )
+                        progress.save()
 
 
 class AddStudent(APIView):
@@ -1106,31 +1160,6 @@ def assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId):
 
         return Response({Constants.JSON_MESSAGE: "Given batch Id is invalid"},
                         status=status.HTTP_403_FORBIDDEN)
-#
-#
-# def addProgressIfNeeded(previousBatchId, currentBatchId, userId):
-#     previousBatch = Batch.objects.filter(batchId=previousBatchId).first()
-#     currentBatch = Batch.objects.filter(batchId=currentBatchId).first()
-#     previousLatestLevel = previousBatch.latestLevelId
-#     currentLatestLevel = currentBatch.latestLevelId
-#     previousLatestClass = previousBatch.latestClassId
-#     currentLatestClass = currentBatch.latestClassId
-#     if ((currentLatestLevel > previousLatestLevel) or
-#             (currentLatestLevel == previousLatestLevel and previousLatestClass < currentLatestClass)):
-#         for i in range(previousLatestLevel, currentLatestLevel +1):
-#             curriculum = Curriculum.objects.filter(levelId=i)
-#             for quiz in curriculum:
-#                 if ((quiz.levelId < currentLatestLevel) or
-#                         (quiz.classId <= currentLatestClass and
-#                          quiz.levelId == currentLatestLevel)):
-#                     if not Progress.objects.filter(quiz_id=quiz.quizId, user_id=userId).first():
-#                         progress = Progress.objects.create(
-#                             quiz_id=quiz.quizId,
-#                             user_id=userId
-#                         )
-#                         progress.save()
-#                 else:
-#                     break
 
 
 def encryptPassword(password):
