@@ -24,7 +24,6 @@ urlpatterns = [
     path('getBatch/', views.GetBatch.as_view()),
 
     path('editBatch/', views.EditBatchDetails.as_view()),
-    # path('deleteBatch/', views.DeleteBatch.as_view()),
 
     path('addTeacher/', views.AddTeacher.as_view()),
     path('getTeachers/', views.GetTeachers.as_view()),
@@ -54,8 +53,8 @@ urlpatterns = [
     path('getBatchTeacher/', views.GetBatchTeacher.as_view()),
     path('updateBatchTeacher/', views.UpdateBatchTeacher.as_view()),
     path('accountDeactivate/', views.AccountDeactivation.as_view()),
+    path('accountActivate/', views.AccountReactivate.as_view()),
     path('accountDeletion/', views.AccountDelete.as_view()),
     path('bulkAddStudents/', views.BulkAddStudents.as_view())
 
-    # path('/token', views.GetCSRFToken.as_view() , name='authentication')
 ]

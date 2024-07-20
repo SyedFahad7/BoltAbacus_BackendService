@@ -30,6 +30,8 @@ class SignIn(APIView):
         user = UserDetails.objects.filter(email=email).values()
         if user.exists():
             user = user.first()
+            if user[Constants.BLOCKED] == True:
+                return Response({Constants.JSON_MESSAGE: "The user has been deactivated, Please contact the administrator"})
             user_password = user[Constants.ENCRYPTED_PASSWORD]
             if password == user_password:
                 organization = OrganizationTag.objects.filter(tagId=user["tag_id"]).first()
@@ -825,6 +827,7 @@ class GetStudentByName(APIView):
                         Constants.PHONE_NUMBER: student.phoneNumber,
                         Constants.EMAIL: student.email,
                         Constants.TAG: tagName,
+                        Constants.BLOCKED: student.blocked,
                         Constants.BATCH_NAME: studentBatch.batchName
                     })
             return Response({"students": studentsDetails}, status=status.HTTP_200_OK )
@@ -913,7 +916,7 @@ class UpdateStudentBatch(APIView):
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             
             userDeatils = UserDetails.objects.filter(userId=userId).first()
-            
+
             if userDeatils.role == Constants.ADMIN or userDeatils.role == Constants.SUB_ADMIN:
                 data = request.data
                 studentId = data[Constants.USER_ID]
@@ -1016,7 +1019,8 @@ class GetStudents(APIView):
                                  Constants.FIRST_NAME: student.firstName,
                                  Constants.LAST_NAME: student.lastName,
                                  Constants.PHONE_NUMBER: student.phoneNumber,
-                                 Constants.EMAIL: student.email})
+                                 Constants.EMAIL: student.email,
+                                 Constants.BLOCKED: student.blocked})
             return Response({"students": students}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2015,6 +2019,46 @@ class AccountDelete(APIView):
 def getTagName(tagId):
     organization = OrganizationTag.objects.filter(tagId=tagId).first()
     return organization.tagName
+
+
+class AccountReactivate(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            userDeatils = UserDetails.objects.filter(userId=userId).first()
+            if userDeatils.role == Constants.ADMIN or userDeatils.role == Constants.SUB_ADMIN:
+
+                activationUserId = request.data[Constants.USER_ID]
+                activationUserDetails = UserDetails.objects.filter(userId=activationUserId).first()
+                if activationUserDetails is None:
+                    return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if userDeatils.role == Constants.SUB_ADMIN:
+                    if activationUserDetails.tag_id != userDeatils.tag_id:
+                        return Response({Constants.JSON_MESSAGE: "You cannot activate the account, please contact the administration"}, 
+                                        status=status.HTTP_403_FORBIDDEN)
+                if activationUserDetails.blocked == False:
+                    return Response({Constants.JSON_MESSAGE: "User is already activated."}, status=status.HTTP_409_CONFLICT)
+                activationUserDetails.blocked = False
+                activationUserDetails.blockedTimestamp = datetime.datetime.today()
+                activationUserDetails.save()
+                return Response({Constants.JSON_MESSAGE: "User has been activated successfully."}, status=status.HTTP_200_OK)
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 
 def temp():
