@@ -31,7 +31,7 @@ class SignIn(APIView):
         if user.exists():
             user = user.first()
             if user[Constants.BLOCKED] == True:
-                return Response({Constants.JSON_MESSAGE: "The user has been deactivated, Please contact the administrator"})
+                return Response({Constants.JSON_MESSAGE: "The user has been deactivated, Please contact the administrator"}, status=status.HTTP_403_FORBIDDEN)
             user_password = user[Constants.ENCRYPTED_PASSWORD]
             if password == user_password:
                 organization = OrganizationTag.objects.filter(tagId=user["tag_id"]).first()
