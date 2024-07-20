@@ -1950,14 +1950,14 @@ class AccountDeactivation(APIView):
                 deactivationUserId = request.data[Constants.USER_ID]
                 deactivationUserDetails = UserDetails.objects.filter(userId=deactivationUserId).first()
                 if deactivationUserDetails is None:
-                    return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({Constants.JSON_MESSAGE: "Given user is Invalid."}, status=status.HTTP_400_BAD_REQUEST)
 
                 if userDeatils.role == Constants.SUB_ADMIN:
                     if deactivationUserDetails.tag_id != userDeatils.tag_id:
                         return Response({Constants.JSON_MESSAGE: "You cannot deactivate the account, please contact the administration"}, 
                                         status=status.HTTP_403_FORBIDDEN)
                 if deactivationUserDetails.blocked == True:
-                    return Response({Constants.JSON_MESSAGE: "User is already deactivated."}, status=status.HTTP_409_CONFLICT)
+                    return Response({Constants.JSON_MESSAGE: "Given user is already deactivated."}, status=status.HTTP_409_CONFLICT)
                 deactivationUserDetails.blocked = True
                 deactivationUserDetails.blockedTimestamp = datetime.datetime.today()
                 deactivationUserDetails.save()
@@ -1991,20 +1991,21 @@ class AccountDelete(APIView):
                 userDeatils.delete()
                 return Response({Constants.JSON_MESSAGE: "User is deleted successfully."}, status=status.HTTP_200_OK)
             
-            if userDeatils.role == Constants.SUB_ADMIN:
+            if userDeatils.role == Constants.SUB_ADMIN or userDeatils.role == Constants.ADMIN:
                 deletionUserId = request.data['userId']
                 deletionUserDetails = UserDetails.objects.filter(userId=deletionUserId).first()
 
                 if deletionUserDetails is None:
-                    return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({Constants.JSON_MESSAGE: "Given user is Invalid."}, status=status.HTTP_400_BAD_REQUEST)
 
-                if deletionUserDetails.role != Constants.TEACHER and deletionUserDetails.role != Constants.STUDENT:
-                    return Response({Constants.JSON_MESSAGE: "User is not a Teacher or a Student"}, status=status.HTTP_401_UNAUTHORIZED)
+                if deletionUserDetails.role != Constants.TEACHER:
+                    return Response({Constants.JSON_MESSAGE: "Given user is not a Teacher"}, status=status.HTTP_401_UNAUTHORIZED)
                 
                 else:
-                    if deletionUserDetails.tag_id != userDeatils.tag_id:
-                        return Response({Constants.JSON_MESSAGE: "You cannot delete the account, please contact the administration"}, 
-                                        status=status.HTTP_403_FORBIDDEN)
+                    if userDeatils.role == Constants.SUB_ADMIN:
+                        if deletionUserDetails.tag_id != userDeatils.tag_id:
+                            return Response({Constants.JSON_MESSAGE: "You cannot delete the account, please contact the administration"}, 
+                                            status=status.HTTP_403_FORBIDDEN)
                     
                     deletionUserDetails.delete()
                     return Response({Constants.JSON_MESSAGE: "User is deleted successfully."}, status=status.HTTP_200_OK)
