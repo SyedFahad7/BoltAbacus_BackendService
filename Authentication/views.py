@@ -1867,7 +1867,6 @@ class BulkAddStudents(APIView):
 
 
 
-
 class GetBatchTeacher(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
@@ -1896,6 +1895,46 @@ class GetBatchTeacher(APIView):
                 
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AccountDeactivation(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            userDeatils = UserDetails.objects.filter(userId=userId).first()
+            if userDeatils.role == Constants.ADMIN or userDeatils.role == Constants.SUB_ADMIN:
+
+                deactivationUserId = request.data[Constants.USER_ID]
+                deactivationUserDetails = UserDetails.objects.filter(userId=deactivationUserId).first()
+                if deactivationUserDetails is None:
+                    return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if userDeatils.role == Constants.SUB_ADMIN:
+                    if deactivationUserDetails.tag_id != userDeatils.tag_id:
+                        return Response({Constants.JSON_MESSAGE: "You cannot deactivate the account, please contact the administration"}, 
+                                        status=status.HTTP_403_FORBIDDEN)
+                if deactivationUserDetails.blocked == True:
+                    return Response({Constants.JSON_MESSAGE: "User is already deactivated."}, status=status.HTTP_409_CONFLICT)
+                deactivationUserDetails.blocked = True
+                deactivationUserDetails.save()
+                return Response({Constants.JSON_MESSAGE: "User has been deactivated successfully."}, status=status.HTTP_200_OK)
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 
 def getTagName(tagId):

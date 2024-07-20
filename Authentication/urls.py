@@ -54,6 +54,7 @@ urlpatterns = [
     path('updateTagDetails/', views.UpdateOrganizationDetails.as_view()),
     path('getBatchTeacher/', views.GetBatchTeacher.as_view()),
     path('updateBatchTeacher/', views.UpdateBatchTeacher.as_view()),
+    path('accountDeactivate/', views.AccountDeactivation.as_view()),
     path('bulkAddStudents/', views.BulkAddStudents.as_view())
 
     # path('/token', views.GetCSRFToken.as_view() , name='authentication')
