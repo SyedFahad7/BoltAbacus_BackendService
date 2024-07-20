@@ -28,6 +28,7 @@ class UserDetails(models.Model):
     encryptedPassword = models.CharField()
     created_date = models.DateField()
     blocked = models.BooleanField()
+    blockedTimestamp = models.DateField(default=datetime.today)
     tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE, default=1)
 
 

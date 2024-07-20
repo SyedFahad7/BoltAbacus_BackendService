@@ -1,6 +1,6 @@
 import datetime
 import random
-
+import time
 import jwt
 import json
 from rest_framework import status
@@ -1926,6 +1926,7 @@ class AccountDeactivation(APIView):
                 if deactivationUserDetails.blocked == True:
                     return Response({Constants.JSON_MESSAGE: "User is already deactivated."}, status=status.HTTP_409_CONFLICT)
                 deactivationUserDetails.blocked = True
+                deactivationUserDetails.blockedTimestamp = datetime.datetime.today()
                 deactivationUserDetails.save()
                 return Response({Constants.JSON_MESSAGE: "User has been deactivated successfully."}, status=status.HTTP_200_OK)
             else:
@@ -1936,6 +1937,51 @@ class AccountDeactivation(APIView):
 
 
 
+class AccountDelete(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            userDeatils = UserDetails.objects.filter(userId=userId).first()
+
+            if userDeatils is None:
+                return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+            if userDeatils.role == Constants.STUDENT:
+                userDeatils.delete()
+                return Response({Constants.JSON_MESSAGE: "User is deleted successfully."}, status=status.HTTP_200_OK)
+            
+            if userDeatils.role == Constants.SUB_ADMIN:
+                deletionUserId = request.data['userId']
+                deletionUserDetails = UserDetails.objects.filter(userId=deletionUserId).first()
+
+                if deletionUserDetails is None:
+                    return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if deletionUserDetails.role != Constants.TEACHER and deletionUserDetails.role != Constants.STUDENT:
+                    return Response({Constants.JSON_MESSAGE: "User is not a Teacher or a Student"}, status=status.HTTP_401_UNAUTHORIZED)
+                
+                else:
+                    if deletionUserDetails.tag_id != userDeatils.tag_id:
+                        return Response({Constants.JSON_MESSAGE: "You cannot delete the account, please contact the administration"}, 
+                                        status=status.HTTP_403_FORBIDDEN)
+                    
+                    deletionUserDetails.delete()
+                    return Response({Constants.JSON_MESSAGE: "User is deleted successfully."}, status=status.HTTP_200_OK)
+
+            return Response({Constants.JSON_MESSAGE: "You cannot delete the account, please contact the administration"}, 
+                            status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 def getTagName(tagId):
     organization = OrganizationTag.objects.filter(tagId=tagId).first()
@@ -1944,10 +1990,13 @@ def getTagName(tagId):
 
 def temp():
     # print(TopicDetails.objects.filter(levelId=3).values())
-    print(OrganizationTag.objects.all().values())
-    # user = UserDetails.objects.filter(role=Constants.TEACHER)
+    # print(OrganizationTag.objects.all().values())
+    user = UserDetails.objects.filter(userId=6)
     # count=0
-    # for i in user:
+    for i in user:
+        i.blocked = False
+        i.save()
+        print(i.email, i.encryptedPassword, i.userId, i.tag_id, i.blockedTimestamp)
     #     count+=1
     # print(count)
     # print(user.tag_id)
