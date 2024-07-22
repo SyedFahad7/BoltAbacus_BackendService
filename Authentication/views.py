@@ -103,7 +103,7 @@ class CurrentLevelsV2(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
@@ -151,7 +151,7 @@ class ClassProgress(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
@@ -209,7 +209,7 @@ class TopicsData(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).values().first()
@@ -252,7 +252,7 @@ class QuizQuestionsData(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
@@ -324,7 +324,12 @@ class QuizCorrection(APIView):
                 idToken = request.headers[Constants.TOKEN_HEADER]
                 if idToken is None:
                     return Response({Constants.JSON_MESSAGE: "tokenExpired"})
-                requestUserId = IdExtraction(idToken)
+                try:
+                    requestUserId = IdExtraction(idToken)
+                    if isinstance(requestUserId, Exception):
+                        raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+                except Exception as e:
+                    return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
                 user = UserDetails.objects.filter(userId=requestUserId).first()
                 requestQuizId = data[Constants.QUIZ_ID]
 
@@ -355,7 +360,7 @@ class ReportDetails(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             data = request.data
@@ -411,7 +416,7 @@ class ResetPassword(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             data = request.data
@@ -574,7 +579,7 @@ class GetAllBatches(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -713,7 +718,7 @@ class AddTeacher(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -772,7 +777,7 @@ class GetTeachers(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -814,7 +819,7 @@ class GetStudentByName(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -858,7 +863,7 @@ class GetStudentByNameV2(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -901,7 +906,7 @@ class UpdateBatchTeacher(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -935,7 +940,7 @@ class UpdateStudentBatch(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             
@@ -1013,7 +1018,7 @@ class AddStudent(APIView):
         try:
             userId = IdExtraction(requestUserToken)
             if isinstance(userId, Exception):
-                raise Exception(requestUserToken)
+                raise Exception(Constants.INVALID_TOKEN_MESSAGE)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
         user = UserDetails.objects.filter(userId=userId).first()
@@ -1219,7 +1224,7 @@ class UpdateBatchLink(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             batchId = data[Constants.BATCH_ID]
@@ -1247,7 +1252,7 @@ class GetTeacherBatches(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -1288,7 +1293,7 @@ class UpdateClass(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             batchId = data[Constants.BATCH_ID]
@@ -1366,7 +1371,7 @@ class GetClassReport(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             teacher = UserDetails.objects.filter(userId=requestUserId).first()
@@ -1442,7 +1447,7 @@ class GetStudentProgressFromStudent(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             return getStudentProgress(userId)
@@ -1641,7 +1646,7 @@ class ResetPasswordV2(APIView):
             try:
                 requestUserId = IdExtraction(requestUserToken)
                 if isinstance(requestUserId, Exception):
-                    raise Exception(requestUserToken)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             password = data[Constants.PASSWORD]
@@ -1754,7 +1759,7 @@ class AddOrganizationTagDetails(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             requestData = request.data
@@ -1786,7 +1791,7 @@ class GetOrganizationTagDetails(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             requestData = request.data
@@ -1820,7 +1825,7 @@ class UpdateOrganizationDetails(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             requestData = request.data
@@ -1852,7 +1857,7 @@ class BulkAddStudents(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -1933,7 +1938,7 @@ class GetBatchTeacher(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
@@ -1964,7 +1969,7 @@ class AccountDeactivation(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             
@@ -2003,7 +2008,7 @@ class AccountDelete(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             
@@ -2055,7 +2060,7 @@ class AccountReactivate(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             
@@ -2093,7 +2098,7 @@ class GetStudentBatchDetails(APIView):
             try:
                 userId = IdExtraction(requestUserToken)
                 if isinstance(userId, Exception):
-                    raise Exception(userId)
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             
