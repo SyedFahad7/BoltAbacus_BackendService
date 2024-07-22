@@ -55,6 +55,7 @@ urlpatterns = [
     path('accountDeactivate/', views.AccountDeactivation.as_view()),
     path('accountActivate/', views.AccountReactivate.as_view()),
     path('accountDeletion/', views.AccountDelete.as_view()),
+    path('getStudentBatchDetails/', views.GetStudentBatchDetails.as_view()),
     path('bulkAddStudents/', views.BulkAddStudents.as_view())
 
 ]

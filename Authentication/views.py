@@ -2084,7 +2084,55 @@ class AccountReactivate(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetStudentBatchDetails(APIView):
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(userId)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            userDeatils = UserDetails.objects.filter(userId=userId).first()
+            if userDeatils is None:
+                    return Response({Constants.JSON_MESSAGE: "Invalid user."}, status=status.HTTP_400_BAD_REQUEST)
+               
+            if userDeatils.role == Constants.SUB_ADMIN:
+                studentId = request.data[Constants.USER_ID]
+                studentDetails = UserDetails.objects.filter(userId = studentId).first()
+                if studentDetails is None:
+                    return Response({Constants.JSON_MESSAGE: "Given user is Invalid."}, status=status.HTTP_400_BAD_REQUEST)
+                if studentDetails.role != Constants.STUDENT:
+                    return Response({Constants.JSON_MESSAGE: "Given user is not a Student."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if studentDetails.tag_id != userDeatils.tag_id:
+                    return Response({Constants.JSON_MESSAGE: "This student cannot be moved, please contact the administration"}, 
+                            status=status.HTTP_403_FORBIDDEN)
+                batchDetails = Student.objects.filter(user_id=studentId).first()
+                if batchDetails is None:
+                    return Response({Constants.JSON_MESSAGE: "Given user is Invalid."}, status=status.HTTP_400_BAD_REQUEST)
+                studentBatchDetails = Batch.objects.filter(batchId=batchDetails.batch_id).first()
+                if studentBatchDetails is None:
+                    return Response({Constants.JSON_MESSAGE: "Given user is Invalid."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    Constants.FIRST_NAME: studentDetails.firstName,
+                    Constants.LAST_NAME: studentDetails.lastName,
+                    Constants.EMAIL: studentDetails.email,
+                    Constants.BATCH_ID: studentBatchDetails.batchId,
+                    Constants.BATCH_NAME: studentBatchDetails.batchName
+                }, status=status.HTTP_200_OK)
+                pass
+            else:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def temp():
     print(OrganizationTag.objects.all().values())
