@@ -107,6 +107,8 @@ class CurrentLevelsV2(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
+            if userBatchDetails is None:
+                return Response({Constants.JSON_MESSAGE: "Given user is Invalid or not a Student."}, status=status.HTTP_400_BAD_REQUEST)
             userBatchId = userBatchDetails.batch_id
             userBatch = Batch.objects.filter(batchId=userBatchId).first()
             latestLevel = userBatchDetails.latestLevelId
@@ -153,6 +155,8 @@ class ClassProgress(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
+            if userBatchDetails is None:
+                return Response({Constants.JSON_MESSAGE: "Given user is Invalid or not a Student."}, status=status.HTTP_400_BAD_REQUEST)
             latestLevel = userBatchDetails.latestLevelId
             latestClass = userBatchDetails.latestClassId
             progressData = []
@@ -161,16 +165,21 @@ class ClassProgress(APIView):
             elif latestLevel >= requestLevelId:
                 for currentClassId in range(1, latestClass + 1):
                     curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=currentClassId)
-                    classProgress = []
+                    classProgress = {}
                     for quiz in curriculumDetails:
                         quizId = quiz.quizId
                         progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).first()
-                        classProgress.append(
-                            {Constants.TOPIC_ID: quiz.topicId,
-                            'QuizType': quiz.quizType,
-                            Constants.PERCENTAGE: progress.percentage,
-                            Constants.TIME: progress.time})
-                    progressData.append({Constants.CLASS_ID: currentClassId, "classProgress": classProgress})
+                        try:
+                            classProgress[quiz.topicId].update(
+                                {quiz.quizType: {Constants.PERCENTAGE: progress.percentage,
+                            Constants.TIME: progress.time}
+                                })
+                        except:
+                            classProgress[quiz.topicId] = {
+                                quiz.quizType: {Constants.PERCENTAGE: progress.percentage,
+                                Constants.TIME: progress.time}
+                                }
+                    progressData.append({Constants.CLASS_ID: currentClassId, "topics": classProgress})
                 return Response({Constants.PROGRESS: progressData}, status=status.HTTP_200_OK)
             else:
                 return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
@@ -883,6 +892,16 @@ class UpdateBatchTeacher(APIView):
 
     def post(self, request):
         try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(requestUserToken)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user.role != Constants.TEACHER:
+                return Response({Constants.JSON_MESSAGE: "User is not a Teacher."}, status=status.HTTP_401_UNAUTHORIZED)
             data = request.data
             currentTeacherId = data[Constants.CURRENT_TEACHER_ID]
             futureTeacherId = data[Constants.FUTURE_TEACHER_ID]
@@ -2063,19 +2082,6 @@ class AccountReactivate(APIView):
 
 
 def temp():
-    # print(TopicDetails.objects.filter(levelId=3).values())
-    # print(OrganizationTag.objects.all().values())
-    user = UserDetails.objects.filter(userId=6)
-    # count=0
-    for i in user:
-        i.blocked = False
-        i.save()
-        print(i.email, i.encryptedPassword, i.userId, i.tag_id, i.blockedTimestamp)
-    #     count+=1
-    # print(count)
-    # print(user.tag_id)
-    # print(Batch.objects.all().values())
-    # print(Curriculum.objects.filter(levelId=1, classId=4).values(), "\n")
-    # print(Progress.objects.filter(user_id=2).values())
+    print(OrganizationTag.objects.all().values())
 
 # Create your views here.
