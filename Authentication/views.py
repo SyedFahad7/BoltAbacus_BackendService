@@ -941,15 +941,15 @@ class UpdateStudentBatch(APIView):
             
             userDeatils = UserDetails.objects.filter(userId=userId).first()
 
-            if userDeatils.role == Constants.ADMIN or userDeatils.role == Constants.SUB_ADMIN:
+            if userDeatils.role == Constants.SUB_ADMIN:
                 data = request.data
                 studentId = data[Constants.USER_ID]
                 student = UserDetails.objects.filter(userId=studentId).first()
 
                 if student:
                     if student.role == Constants.STUDENT:
-                        if userDeatils.role == Constants.SUB_ADMIN and (student.tag_id != userDeatils.tag_id):
-                            return Response({Constants.JSON_MESSAGE: "You cannot delete the account, please contact the administration"}, 
+                        if student.tag_id != userDeatils.tag_id:
+                            return Response({Constants.JSON_MESSAGE: "This student cannot be moved, please contact the administration"}, 
                                         status=status.HTTP_403_FORBIDDEN)
 
                         batchId = data[Constants.BATCH_ID]
@@ -2110,7 +2110,7 @@ class GetStudentBatchDetails(APIView):
                     return Response({Constants.JSON_MESSAGE: "Given user is not a Student."}, status=status.HTTP_400_BAD_REQUEST)
 
                 if studentDetails.tag_id != userDeatils.tag_id:
-                    return Response({Constants.JSON_MESSAGE: "This student cannot be moved, please contact the administration"}, 
+                    return Response({Constants.JSON_MESSAGE: "This student cannot be viwed, please contact the administration"}, 
                             status=status.HTTP_403_FORBIDDEN)
                 batchDetails = Student.objects.filter(user_id=studentId).first()
                 if batchDetails is None:
