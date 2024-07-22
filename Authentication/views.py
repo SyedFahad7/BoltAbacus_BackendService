@@ -578,7 +578,12 @@ class GetAllBatches(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
-            batchIdDetails = Batch.objects.filter(tag_id=user.tag_id).values()
+            if user.role != Constants.SUB_ADMIN and user.role != Constants.ADMIN:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+            if user.role == Constants.SUB_ADMIN:
+                batchIdDetails = Batch.objects.filter(tag_id=user.tag_id).values()
+            else:
+                batchIdDetails = Batch.objects.all().values()
             batchIds = []
             for batchId in batchIdDetails:
                 batchIds.append(
