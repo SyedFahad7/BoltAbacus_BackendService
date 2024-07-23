@@ -910,8 +910,8 @@ class UpdateBatchTeacher(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
-            if user.role != Constants.TEACHER:
-                return Response({Constants.JSON_MESSAGE: "User is not a Teacher."}, status=status.HTTP_401_UNAUTHORIZED)
+            if user.role != Constants.SUB_ADMIN:
+                return Response({Constants.JSON_MESSAGE: "User is not a Admin."}, status=status.HTTP_401_UNAUTHORIZED)
             data = request.data
             currentTeacherId = data[Constants.CURRENT_TEACHER_ID]
             futureTeacherId = data[Constants.FUTURE_TEACHER_ID]
