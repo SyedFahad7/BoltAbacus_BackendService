@@ -910,6 +910,7 @@ class UpdateBatchTeacher(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
+            print(user)
             if user.role != Constants.SUB_ADMIN:
                 return Response({Constants.JSON_MESSAGE: "User is not a Admin."}, status=status.HTTP_401_UNAUTHORIZED)
             data = request.data
@@ -917,6 +918,14 @@ class UpdateBatchTeacher(APIView):
             futureTeacherId = data[Constants.FUTURE_TEACHER_ID]
             currentTeacher = UserDetails.objects.filter(userId=currentTeacherId).first()
             futureTeacher = UserDetails.objects.filter(userId=futureTeacherId).first()
+            if currentTeacher is None:
+                    return Response({Constants.JSON_MESSAGE: "Given User doesn't exisit."},
+                                    status=status.HTTP_404_FORBIDDEN)
+            if futureTeacher is None:
+                    return Response({Constants.JSON_MESSAGE: "User you want to assign the batch to does not exist."},
+                                    status=status.HTTP_404_NOT_FOUND)
+
+            print(currentTeacher, futureTeacher)
             if currentTeacher and futureTeacherId:
                 if currentTeacher.role == Constants.TEACHER and futureTeacher.role == Constants.TEACHER:
                     batchId = data[Constants.BATCH_ID]
@@ -1182,6 +1191,8 @@ def assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId):
             teacher = Teacher.objects.filter(user_id=currentTeacherId, batchId=batchId).first()
             if teacher:
                 teacher.delete()
+            else:
+                return Response({Constants.JSON_MESSAGE: "Given current teacher is not the teacher of the batch."}, status=status.HTTP_403_FORBIDDEN)
             Teacher.objects.create(
                 user_id = futureTeacherId,
                 batchId = batchId
