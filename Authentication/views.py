@@ -918,17 +918,24 @@ class UpdateBatchTeacher(APIView):
             futureTeacherId = data[Constants.FUTURE_TEACHER_ID]
             currentTeacher = UserDetails.objects.filter(userId=currentTeacherId).first()
             futureTeacher = UserDetails.objects.filter(userId=futureTeacherId).first()
-            if currentTeacher is None:
-                    return Response({Constants.JSON_MESSAGE: "Given User doesn't exisit."},
-                                    status=status.HTTP_404_FORBIDDEN)
+            batchId = data[Constants.BATCH_ID]
+
             if futureTeacher is None:
                     return Response({Constants.JSON_MESSAGE: "User you want to assign the batch to does not exist."},
                                     status=status.HTTP_404_NOT_FOUND)
+            if currentTeacherId == 0:
+                if futureTeacher.role == Constants.TEACHER:
+                    return assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId)
+                else:
+                    return Response({Constants.JSON_MESSAGE: "Given user is not a teacher"},
+                                    status=status.HTTP_403_FORBIDDEN)
+                
+            if currentTeacher is None:
+                    return Response({Constants.JSON_MESSAGE: "Given User doesn't exisit."},
+                                    status=status.HTTP_404_FORBIDDEN)
 
-            print(currentTeacher, futureTeacher)
-            if currentTeacher and futureTeacherId:
+            if currentTeacher and futureTeacher:
                 if currentTeacher.role == Constants.TEACHER and futureTeacher.role == Constants.TEACHER:
-                    batchId = data[Constants.BATCH_ID]
                     return assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId)
                 else:
                     return Response({Constants.JSON_MESSAGE: "Given user is not a teacher"},
@@ -1191,8 +1198,13 @@ def assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId):
             teacher = Teacher.objects.filter(user_id=currentTeacherId, batchId=batchId).first()
             if teacher:
                 teacher.delete()
+            elif currentTeacherId == 0:
+                pass
             else:
                 return Response({Constants.JSON_MESSAGE: "Given current teacher is not the teacher of the batch."}, status=status.HTTP_403_FORBIDDEN)
+            checkBatchTeacher = Teacher.objects.filter(user_id=futureTeacherId, batchId=batchId).first()
+            if checkBatchTeacher is not None:
+                return Response({Constants.JSON_MESSAGE: "Given user is already the teacher of the batch."}, status=status.HTTP_400_BAD_REQUEST)
             Teacher.objects.create(
                 user_id = futureTeacherId,
                 batchId = batchId
@@ -2151,6 +2163,6 @@ class GetStudentBatchDetails(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def temp():
-    print(OrganizationTag.objects.all().values())
+    print()
 
 # Create your views here.
