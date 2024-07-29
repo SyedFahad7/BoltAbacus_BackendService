@@ -163,6 +163,8 @@ class ClassProgress(APIView):
             if requestLevelId <= 0 or requestLevelId > 10 or latestLevel < requestLevelId:
                 return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
             elif latestLevel >= requestLevelId:
+                if requestLevelId < latestLevel:
+                    latestClass = 12
                 for currentClassId in range(1, latestClass + 1):
                     curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=currentClassId)
                     classProgress = {}
