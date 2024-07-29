@@ -160,7 +160,7 @@ class ClassProgress(APIView):
             latestLevel = userBatchDetails.latestLevelId
             latestClass = userBatchDetails.latestClassId
             progressData = []
-            if requestLevelId <= 0 or requestLevelId > 10 or latestLevel > requestLevelId:
+            if requestLevelId <= 0 or requestLevelId > 10 or latestLevel < requestLevelId:
                 return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
             elif latestLevel >= requestLevelId:
                 for currentClassId in range(1, latestClass + 1):
@@ -934,14 +934,10 @@ class UpdateBatchTeacher(APIView):
                     return Response({Constants.JSON_MESSAGE: "Given User doesn't exisit."},
                                     status=status.HTTP_404_FORBIDDEN)
 
-            if currentTeacher and futureTeacher:
-                if currentTeacher.role == Constants.TEACHER and futureTeacher.role == Constants.TEACHER:
-                    return assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId)
-                else:
-                    return Response({Constants.JSON_MESSAGE: "Given user is not a teacher"},
-                                    status=status.HTTP_403_FORBIDDEN)
+            if currentTeacher.role == Constants.TEACHER and futureTeacher.role == Constants.TEACHER:
+                return assignTeacherToBatch(batchId, futureTeacherId, currentTeacherId)
             else:
-                return Response({Constants.JSON_MESSAGE: "Given user doesn't exist"},
+                return Response({Constants.JSON_MESSAGE: "Given user is not a teacher"},
                                 status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
