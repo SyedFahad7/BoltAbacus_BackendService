@@ -165,6 +165,10 @@ class ClassProgress(APIView):
             elif latestLevel >= requestLevelId:
                 if requestLevelId < latestLevel:
                     latestClass = 12
+                finalTestPercentage = 0
+                oralTestPercentage = 0
+                finalTestTime = 0
+                oralTestTime = 0
                 for currentClassId in range(0, latestClass + 1):
                     curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=currentClassId)
                     classProgress = {}
@@ -181,8 +185,17 @@ class ClassProgress(APIView):
                                 quiz.quizType: {Constants.PERCENTAGE: progress.percentage,
                                 Constants.TIME: progress.time}
                                 }
-                    progressData.append({Constants.CLASS_ID: currentClassId, "topics": classProgress})
-                return Response({Constants.PROGRESS: progressData}, status=status.HTTP_200_OK)
+                    if currentClassId != 0:
+                        progressData.append({Constants.CLASS_ID: currentClassId, "topics": classProgress})
+                    else:
+                        finalTestPercentage = classProgress[0][Constants.FINAL_TEST][Constants.PERCENTAGE]
+                        oralTestPercentage = classProgress[0][Constants.ORAL_TEST][Constants.TIME]
+                        finalTestTime = classProgress[0][Constants.FINAL_TEST][Constants.PERCENTAGE]
+                        oralTestTime = classProgress[0][Constants.ORAL_TEST][Constants.TIME]
+                return Response({Constants.PROGRESS: progressData,
+                                "finalTest": {Constants.PERCENTAGE: finalTestPercentage, Constants.TIME: finalTestTime},
+                                "oralTest": {Constants.PERCENTAGE: oralTestPercentage, Constants.TIME: oralTestTime}},
+                                status=status.HTTP_200_OK)
             else:
                 return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
@@ -1424,7 +1437,7 @@ class GetClassReport(APIView):
                                 status=status.HTTP_403_FORBIDDEN)
             students = Student.objects.filter(batch_id=batchId)
             studentReports = []
-            if classId == 0: 
+            if classId == 0:
                 finalTest = Curriculum.objects.filter(levelId=levelId,
                                             classId=classId,
                                             topicId=0,
@@ -1454,6 +1467,7 @@ class GetClassReport(APIView):
                                         "oralTest": oralTestProgress.percentage})
                 
                 return Response({"reports": studentReports}, status=status.HTTP_200_OK)
+            
             classwork = Curriculum.objects.filter(levelId=levelId,
                                                   classId=classId,
                                                   topicId=topicId,
@@ -1583,6 +1597,7 @@ def getStudentProgress(userId):
                         {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]})
                     classProgressJson.update({"topics": topicProgressData})
                     classProgressData.append(classProgressJson)
+            
             levelsProgressJson.update({Constants.FINAL_TEST: classProgress[0][0].get(Constants.FINAL_TEST, 0), Constants.FINAL_TEST_TIME: classProgress[0][0].get(Constants.FINAL_TEST_TIME, 0)})
             levelsProgressJson.update({Constants.ORAL_TEST: classProgress[0][0].get(Constants.ORAL_TEST, 0), Constants.ORAL_TEST_TIME: classProgress[0][0].get(Constants.ORAL_TEST_TIME, 0)})
             levelsProgressJson.update({"classes": classProgressData})
