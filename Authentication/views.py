@@ -165,7 +165,7 @@ class ClassProgress(APIView):
             elif latestLevel >= requestLevelId:
                 if requestLevelId < latestLevel:
                     latestClass = 12
-                for currentClassId in range(1, latestClass + 1):
+                for currentClassId in range(0, latestClass + 1):
                     curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId, classId=currentClassId)
                     classProgress = {}
                     for quiz in curriculumDetails:
@@ -275,6 +275,9 @@ class QuizQuestionsData(APIView):
             if requestQuizType == Constants.TEST:
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
+                                                              quizType=requestQuizType).first()
+            elif requestQuizType == Constants.ORAL_TEST or requestQuizType == Constants.FINAL_TEST:
+                curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               quizType=requestQuizType).first()
             else:
                 requestTopicId = data[Constants.TOPIC_ID]
@@ -395,8 +398,13 @@ class ReportDetails(APIView):
                                              Constants.HOMEWORK: result[Constants.HOMEWORK],
                                              Constants.HOMEWORK_TIME: result[Constants.HOMEWORK_TIME]
                                              })
-            test = {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]}
-            return Response({"quiz": progressOfTopics, "test": test})
+            if requestClassId != 0:
+                test = {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]}
+                return Response({"quiz": progressOfTopics, "test": test})
+
+            finalTest = {Constants.FINAL_TEST: topicProgress[0][Constants.FINAL_TEST], Constants.FINAL_TEST_TIME: topicProgress[0][Constants.FINAL_TEST_TIME]}
+            oralTest = {Constants.ORAL_TEST: topicProgress[0][Constants.ORAL_TEST], Constants.ORAL_TEST_TIME: topicProgress[0][Constants.ORAL_TEST_TIME]}
+            return Response({"quiz": progressOfTopics, "finalTest": finalTest, "oralTest": oralTest})
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -481,6 +489,9 @@ class GetAllQuestions(APIView):
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
                                                               quizType=requestQuizType).first()
+            elif requestQuizType == Constants.ORAL_TEST or requestQuizType == Constants.FINAL_TEST:
+                curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
+                                                              quizType=requestQuizType).first()
             else:
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
@@ -513,6 +524,8 @@ class EditQuestion(APIView):
             question = data[Constants.QUESTION]
             correctAnswer = data[Constants.CORRECT_ANSWER]
             questionFromDb = QuizQuestions.objects.filter(questionId=questionId).first()
+            if questionFromDb is None:
+                return Response({Constants.JSON_MESSAGE: "Invalid QuestionId"}, status=status.HTTP_404_NOT_FOUND)
             questionFormat = json.dumps(question)
             questionFromDb.question = questionFormat
             questionFromDb.correctAnswer = correctAnswer
@@ -530,6 +543,8 @@ class GetQuestion(APIView):
             data = request.data
             questionId = data[Constants.QUESTION_ID]
             questionFromDb = QuizQuestions.objects.filter(questionId=questionId).first()
+            if questionFromDb is None:
+                return Response({Constants.JSON_MESSAGE: "Invalid QuestionId"}, status=status.HTTP_404_NOT_FOUND)
             questionFormat = json.loads(questionFromDb.question)
             return Response({Constants.QUESTION_ID: questionId,
                              Constants.QUESTION: questionFormat,
@@ -553,6 +568,9 @@ class AddQuestion(APIView):
             if requestQuizType == Constants.TEST:
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
+                                                              quizType=requestQuizType).first()
+            elif requestQuizType == Constants.ORAL_TEST or requestQuizType == Constants.FINAL_TEST:
+                curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               quizType=requestQuizType).first()
             else:
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
@@ -1404,6 +1422,38 @@ class GetClassReport(APIView):
             if batchTeacher is None:
                 return Response({Constants.JSON_MESSAGE: "Teacher is not assigned to the batch."},
                                 status=status.HTTP_403_FORBIDDEN)
+            students = Student.objects.filter(batch_id=batchId)
+            studentReports = []
+            if classId == 0: 
+                finalTest = Curriculum.objects.filter(levelId=levelId,
+                                            classId=classId,
+                                            topicId=0,
+                                            quizType=Constants.ORAL_TEST).first()
+                
+                oralTest = Curriculum.objects.filter(levelId=levelId,
+                                            classId=classId,
+                                            topicId=0,
+                                            quizType=Constants.FINAL_TEST).first()
+                
+                for student in students:
+                    userId = student.user_id
+                    user = UserDetails.objects.filter(userId=userId).first()
+                    oralTestProgress = Progress.objects.filter(quiz_id=oralTest,
+                                                                user_id=userId).first()
+                    finalTestProgress = Progress.objects.filter(quiz_id=finalTest,
+                                                            user_id=userId).first()
+                    if oralTestProgress is None or finalTestProgress is None:
+                        return Response(
+                            {Constants.JSON_MESSAGE: "Report not found for student " + user.firstName + user.lastName},
+                            status=status.HTTP_404_NOT_FOUND)
+                    
+                    studentReports.append({Constants.USER_ID: user.userId,
+                                        Constants.FIRST_NAME: user.firstName,
+                                        Constants.LAST_NAME: user.lastName,
+                                        "finalTest": finalTestProgress.percentage,
+                                        "oralTest": oralTestProgress.percentage})
+                
+                return Response({"reports": studentReports}, status=status.HTTP_200_OK)
             classwork = Curriculum.objects.filter(levelId=levelId,
                                                   classId=classId,
                                                   topicId=topicId,
@@ -1421,8 +1471,6 @@ class GetClassReport(APIView):
             classworkQuizId = classwork.quizId
             homeworkQuizId = homework.quizId
             testId = test.quizId
-            students = Student.objects.filter(batch_id=batchId)
-            studentReports = []
             for student in students:
                 userId = student.user_id
                 user = UserDetails.objects.filter(userId=userId).first()
@@ -1530,10 +1578,13 @@ def getStudentProgress(userId):
                                                   Constants.CLASSWORK_TIME: result[Constants.CLASSWORK_TIME],
                                                   Constants.HOMEWORK: result[Constants.HOMEWORK],
                                                   Constants.HOMEWORK_TIME: result[Constants.HOMEWORK_TIME]})
-                classProgressJson.update(
-                    {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]})
-                classProgressJson.update({"topics": topicProgressData})
-                classProgressData.append(classProgressJson)
+                if classId != 0:
+                    classProgressJson.update(
+                        {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]})
+                    classProgressJson.update({"topics": topicProgressData})
+                    classProgressData.append(classProgressJson)
+            levelsProgressJson.update({Constants.FINAL_TEST: classProgress[0][0].get(Constants.FINAL_TEST, 0), Constants.FINAL_TEST_TIME: classProgress[0][0].get(Constants.FINAL_TEST_TIME, 0)})
+            levelsProgressJson.update({Constants.ORAL_TEST: classProgress[0][0].get(Constants.ORAL_TEST, 0), Constants.ORAL_TEST_TIME: classProgress[0][0].get(Constants.ORAL_TEST_TIME, 0)})
             levelsProgressJson.update({"classes": classProgressData})
             levelsProgressData.append(levelsProgressJson)
         for classes in levelsProgressData:
@@ -1555,6 +1606,7 @@ def getClassIds(levelId):
     classes = TopicDetails.objects.filter(levelId=levelId)
     for eachClass in classes:
         classIds.add(eachClass.classId)
+    classIds.add(0)
     return classIds
 
 
@@ -1599,6 +1651,9 @@ class BulkAddQuestions(APIView):
             if requestQuizType == Constants.TEST:
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               classId=requestClassId,
+                                                              quizType=requestQuizType).first()
+            elif requestQuizType == Constants.ORAL_TEST or requestQuizType == Constants.FINAL_TEST:
+                curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
                                                               quizType=requestQuizType).first()
             else:
                 curriculumDetails = Curriculum.objects.filter(levelId=requestLevelId,
