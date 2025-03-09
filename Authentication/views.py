@@ -13,7 +13,8 @@ from . import Constants
 from Authentication.models import (UserDetails, Student,
                                    Batch, Curriculum,
                                    TopicDetails, QuizQuestions,
-                                   Progress, Teacher, OrganizationTag)
+                                   Progress, Teacher, OrganizationTag,
+                                   PracticeQuestions)
 
 
 # ------------ Student Related APIs -----------------------
@@ -943,7 +944,6 @@ class UpdateBatchTeacher(APIView):
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
-            print(user)
             if user.role != Constants.SUB_ADMIN:
                 return Response({Constants.JSON_MESSAGE: "User is not a Admin."}, status=status.HTTP_401_UNAUTHORIZED)
             data = request.data
@@ -1426,15 +1426,15 @@ class GetClassReport(APIView):
                     raise Exception(Constants.INVALID_TOKEN_MESSAGE)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
-            teacher = UserDetails.objects.filter(userId=requestUserId).first()
-            if teacher is None:
-                return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
-            if teacher.role != Constants.TEACHER:
-                return Response({Constants.JSON_MESSAGE: "User is not a teacher."}, status=status.HTTP_403_FORBIDDEN)
-            batchTeacher = Teacher.objects.filter(user_id=requestUserId, batchId=batchId).first()
-            if batchTeacher is None:
-                return Response({Constants.JSON_MESSAGE: "Teacher is not assigned to the batch."},
-                                status=status.HTTP_403_FORBIDDEN)
+            # teacher = UserDetails.objects.filter(userId=requestUserId).first()
+            # if teacher is None:
+            #     return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_403_FORBIDDEN)
+            # if teacher.role != Constants.TEACHER:
+            #     return Response({Constants.JSON_MESSAGE: "User is not a teacher."}, status=status.HTTP_403_FORBIDDEN)
+            # batchTeacher = Teacher.objects.filter(user_id=requestUserId, batchId=batchId).first()
+            # if batchTeacher is None:
+            #     return Response({Constants.JSON_MESSAGE: "Teacher is not assigned to the batch."},
+            #                     status=status.HTTP_403_FORBIDDEN)
             students = Student.objects.filter(batch_id=batchId)
             studentReports = []
             if classId == 0:
@@ -2221,15 +2221,169 @@ class GetStudentBatchDetails(APIView):
                     Constants.BATCH_ID: studentBatchDetails.batchId,
                     Constants.BATCH_NAME: studentBatchDetails.batchName
                 }, status=status.HTTP_200_OK)
-                pass
             else:
                 return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
             
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class SubmitPracticeQuestions(APIView):
 
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            data = request.data
+            practiceType = data[Constants.PRACTICE_TYPE]
+            operation = data[Constants.OPERATION]
+            numberOfDigits = data[Constants.NUMBER_OF_DIGITS]
+            numberOfQuestions = data[Constants.NUMBER_OF_QUESTIONS]
+            numberOfRows = data[Constants.NUMBER_OF_ROWS]
+            zigZag = data[Constants.ZIG_ZAG]
+            includeSubtraction = data[Constants.INCLUDE_SUBTRACTION]
+            persistNumberOfDigits = data[Constants.PERSIST_NUMBER_OF_DIGITS]
+            score = data[Constants.SCORE]
+            totalTime = data[Constants.TOTAL_TIME]
+            averageTime = data[Constants.AVERAGE_TIME]  
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
+            if not ifPracticeQuestionsAlreadyExists(data, userId):
+                PracticeQuestions.objects.create(
+                    user_id = userId,
+                    practice_type = practiceType,
+                    operation = operation,
+                    number_of_digits = numberOfDigits,
+                    number_of_questions = numberOfQuestions,
+                    number_of_rows = numberOfRows,
+                    zig_zag = zigZag,
+                    include_subtraction = includeSubtraction,
+                    persist_number_of_digits = persistNumberOfDigits,
+                    score = score,
+                    total_time = totalTime,
+                    average_time = averageTime
+                )
+                return Response({Constants.JSON_MESSAGE: "Practice Attempt stored Successfully"}, status=status.HTTP_200_OK)
+            return Response({Constants.JSON_MESSAGE: "Practice Attempt already stored"}, status=status.HTTP_409_CONFLICT)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class GetStudentPracticeQuestions(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data
+            userId = data[Constants.USER_ID]
+            return getStudentPracticeStatistics(userId)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GetStudentPracticeQuestionsStudent(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            return getStudentPracticeStatistics(userId)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class DeleteStudentPracticeQuestion(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user.role != Constants.SUB_ADMIN and user.role != Constants.ADMIN:
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+
+            requestPracticeQuestionDeletionId = request.data[Constants.PRACTICE_QUESTION_ID]
+            practiceQuestion = PracticeQuestions.objects.filter(practiceQuestionId=requestPracticeQuestionDeletionId).first()
+            if practiceQuestion is None:
+                return Response({Constants.JSON_MESSAGE: "Question Already Deleted or doesnt exist"}, status=status.HTTP_400_BAD_REQUEST)
+            student = practiceQuestion.user 
+            
+            if user.role == Constants.SUB_ADMIN:
+                if student.tag_id != userId.tag_id:
+                    return Response({Constants.JSON_MESSAGE: "You cannot delete this practice question, please contact the administration"}, 
+                                    status=status.HTTP_403_FORBIDDEN)
+                
+            practiceQuestion.delete()
+            return Response({Constants.JSON_MESSAGE: "Deleted the pratice question"}, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+def getStudentPracticeStatistics(userId):
+    try:
+        user = UserDetails.objects.filter(userId=userId).first()
+        if user is None:
+            return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
+        if user.role != Constants.STUDENT:
+            return Response({Constants.JSON_MESSAGE: "User is not a Student"}, status=status.HTTP_403_FORBIDDEN)
+        practiceQuestions = PracticeQuestions.objects.filter(user_id=userId).values(
+                Constants.PRACTICE_QUESTION_ID,
+                Constants.PRACTICE_TYPE,
+                Constants.OPERATION,
+                Constants.NUMBER_OF_DIGITS,
+                Constants.NUMBER_OF_QUESTIONS,
+                Constants.NUMBER_OF_ROWS,
+                Constants.ZIG_ZAG,
+                Constants.INCLUDE_SUBTRACTION,
+                Constants.PERSIST_NUMBER_OF_DIGITS,
+                Constants.SCORE,
+                Constants.TOTAL_TIME,
+                Constants.AVERAGE_TIME
+            ) 
+        return Response({"practiceQuestions": practiceQuestions})
+            
+
+    except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def ifPracticeQuestionsAlreadyExists(data, userId):
+    practiceQuestions =  PracticeQuestions.objects.filter(
+        user_id=userId,
+        practice_type=data[Constants.PRACTICE_TYPE],
+        operation=data[Constants.OPERATION],
+        number_of_digits=data[Constants.NUMBER_OF_DIGITS],
+        number_of_questions=data[Constants.NUMBER_OF_QUESTIONS],
+        number_of_rows=data[Constants.NUMBER_OF_ROWS],
+        zig_zag=data[Constants.ZIG_ZAG],
+        include_subtraction=data[Constants.INCLUDE_SUBTRACTION],
+        persist_number_of_digits=data[Constants.PERSIST_NUMBER_OF_DIGITS],
+        score=data[Constants.SCORE],
+        total_time=data[Constants.TOTAL_TIME],
+        average_time=data[Constants.AVERAGE_TIME]).first()
+    if practiceQuestions is None:
+        return False
+    return True
 def temp():
     print()
 

@@ -56,6 +56,11 @@ urlpatterns = [
     path('accountActivate/', views.AccountReactivate.as_view()),
     path('accountDeletion/', views.AccountDelete.as_view()),
     path('getStudentBatchDetails/', views.GetStudentBatchDetails.as_view()),
-    path('bulkAddStudents/', views.BulkAddStudents.as_view())
+    path('bulkAddStudents/', views.BulkAddStudents.as_view()),
+
+    path('submitPracticeQuestions/', views.SubmitPracticeQuestions.as_view()),
+    path('getStudentPracticeQuestions/', views.GetStudentPracticeQuestions.as_view()),
+    path('getStudentPracticeQuestionsStudent/', views.GetStudentPracticeQuestionsStudent.as_view()),
+    path('deleteStudentPracticeQuestion/', views.DeleteStudentPracticeQuestion.as_view())
 
 ]

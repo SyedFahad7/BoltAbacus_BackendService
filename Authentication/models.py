@@ -86,4 +86,20 @@ class Student(models.Model):
 class Teacher(models.Model):
     user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE)
     batchId = models.IntegerField()
+
+
+class PracticeQuestions(models.Model):
+    practiceQuestionId = models.AutoField(primary_key=True)
+    user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE)
+    practiceType = models.CharField(max_length=20)
+    operation = models.CharField(max_length=50)
+    numberOfDigits = models.IntegerField(default=1)
+    numberOfQuestions = models.IntegerField(default=0)
+    numberOfRows = models.IntegerField(default=1)
+    zigZag = models.BooleanField(default=False)
+    includeSubtraction = models.BooleanField(default=False)
+    persistNumberOfDigits = models.BooleanField(default=False)
+    score = models.IntegerField(default=0)
+    totalTime = models.FloatField(default=0)
+    averageTime = models.FloatField(default=0)
 # Create your models here.
