@@ -2258,17 +2258,17 @@ class SubmitPracticeQuestions(APIView):
             if not ifPracticeQuestionsAlreadyExists(data, userId):
                 PracticeQuestions.objects.create(
                     user_id = userId,
-                    practice_type = practiceType,
+                    practiceType = practiceType,
                     operation = operation,
-                    number_of_digits = numberOfDigits,
-                    number_of_questions = numberOfQuestions,
-                    number_of_rows = numberOfRows,
-                    zig_zag = zigZag,
-                    include_subtraction = includeSubtraction,
-                    persist_number_of_digits = persistNumberOfDigits,
+                    numberOfDigits = numberOfDigits,
+                    numberOfQuestions = numberOfQuestions,
+                    numberOfRows = numberOfRows,
+                    zigZag = zigZag,
+                    includeSubtraction = includeSubtraction,
+                    persistNumberOfDigits = persistNumberOfDigits,
                     score = score,
-                    total_time = totalTime,
-                    average_time = averageTime
+                    totalTime = totalTime,
+                    averageTime = averageTime
                 )
                 return Response({Constants.JSON_MESSAGE: "Practice Attempt stored Successfully"}, status=status.HTTP_200_OK)
             return Response({Constants.JSON_MESSAGE: "Practice Attempt already stored"}, status=status.HTTP_409_CONFLICT)
@@ -2370,17 +2370,17 @@ def getStudentPracticeStatistics(userId):
 def ifPracticeQuestionsAlreadyExists(data, userId):
     practiceQuestions =  PracticeQuestions.objects.filter(
         user_id=userId,
-        practice_type=data[Constants.PRACTICE_TYPE],
+        practiceType=data[Constants.PRACTICE_TYPE],
         operation=data[Constants.OPERATION],
-        number_of_digits=data[Constants.NUMBER_OF_DIGITS],
-        number_of_questions=data[Constants.NUMBER_OF_QUESTIONS],
-        number_of_rows=data[Constants.NUMBER_OF_ROWS],
-        zig_zag=data[Constants.ZIG_ZAG],
-        include_subtraction=data[Constants.INCLUDE_SUBTRACTION],
-        persist_number_of_digits=data[Constants.PERSIST_NUMBER_OF_DIGITS],
+        numberOfDigits=data[Constants.NUMBER_OF_DIGITS],
+        numberOfQuestions=data[Constants.NUMBER_OF_QUESTIONS],
+        numberOfRows=data[Constants.NUMBER_OF_ROWS],
+        zigZag=data[Constants.ZIG_ZAG],
+        includeSubtraction=data[Constants.INCLUDE_SUBTRACTION],
+        persistNumberOfDigits=data[Constants.PERSIST_NUMBER_OF_DIGITS],
         score=data[Constants.SCORE],
-        total_time=data[Constants.TOTAL_TIME],
-        average_time=data[Constants.AVERAGE_TIME]).first()
+        totalTime=data[Constants.TOTAL_TIME],
+        averageTime=data[Constants.AVERAGE_TIME]).first()
     if practiceQuestions is None:
         return False
     return True
