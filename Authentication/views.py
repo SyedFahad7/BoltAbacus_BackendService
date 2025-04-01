@@ -1372,7 +1372,7 @@ class UpdateClass(APIView):
                                 status=status.HTTP_403_FORBIDDEN)
 
             students = Student.objects.filter(batch_id=batchId)
-            curriculum = Curriculum.objects.filter(levelId=nextLevel, classId=nextClass)
+            curriculum = Curriculum.objects.filter(levelId=nextLevel, classId__lte=nextClass)
             for student in students:
                 for quiz in curriculum:
                     if (quiz.levelId < nextLevel) or (quiz.classId <= nextClass and
