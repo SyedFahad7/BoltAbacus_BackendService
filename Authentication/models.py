@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models.functions.datetime import datetime
+from datetime import date
 
 
 # from django.contrib.auth.models import AbstractBaseUser
@@ -7,12 +7,12 @@ from django.db.models.functions.datetime import datetime
 
 class OrganizationTag(models.Model):
     tagId = models.AutoField(primary_key=True)
-    organizationName = models.CharField()
-    tagName = models.CharField(default="BoltAbacus", unique=True)
+    organizationName = models.CharField(max_length=255)
+    tagName = models.CharField(max_length=255, default="BoltAbacus", unique=True)
     isIndividualTeacher = models.BooleanField(default=False)
     numberOfTeachers = models.IntegerField(default=0)
     numberOfStudents = models.IntegerField(default=0)
-    expirationDate = models.DateField(default=datetime.today)
+    expirationDate = models.DateField(default=date.today)
     totalNumberOfStudents = models.IntegerField(default=0)
     maxLevel = models.IntegerField(default=1)
     maxClass = models.IntegerField(default=1)
@@ -24,12 +24,12 @@ class UserDetails(models.Model):
     lastName = models.CharField(max_length=50)
     phoneNumber = models.CharField(max_length=15)
     email = models.EmailField(unique=True)
-    role = models.CharField()
-    encryptedPassword = models.CharField()
+    role = models.CharField(max_length=50)
+    encryptedPassword = models.CharField(max_length=255)
     created_date = models.DateField()
     blocked = models.BooleanField()
-    blockedTimestamp = models.DateField(default=datetime.today)
-    tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE, default=1)
+    blockedTimestamp = models.DateField(default=date.today)
+    tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE)
 
 
 class TopicDetails(models.Model):
@@ -50,8 +50,8 @@ class Curriculum(models.Model):
 class QuizQuestions(models.Model):
     questionId = models.AutoField(primary_key=True)
     quiz = models.ForeignKey(Curriculum, to_field='quizId', null=True, on_delete=models.CASCADE)
-    question = models.CharField()
-    correctAnswer = models.CharField()
+    question = models.CharField(max_length=1000)
+    correctAnswer = models.CharField(max_length=255)
 
 
 class Progress(models.Model):
@@ -65,15 +65,15 @@ class Progress(models.Model):
 
 class Batch(models.Model):
     batchId = models.AutoField(primary_key=True)
-    timeDay = models.CharField()
-    timeSchedule = models.CharField()
+    timeDay = models.CharField(max_length=50)
+    timeSchedule = models.CharField(max_length=100)
     numberOfStudents = models.IntegerField()
     active = models.BooleanField()
-    batchName = models.CharField()
+    batchName = models.CharField(max_length=255)
     latestLevelId = models.IntegerField()
     latestClassId = models.IntegerField()
-    latestLink = models.CharField()
-    tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE, default=1)
+    latestLink = models.CharField(max_length=500)
+    tag = models.ForeignKey(OrganizationTag, to_field="tagId", null=True, on_delete=models.CASCADE)
 
 
 class Student(models.Model):

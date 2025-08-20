@@ -82,12 +82,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'boltabacusdb',
-        # 'NAME': 'BoltAbacus',
         'USER': 'postgres',
         'PASSWORD': '12345678',
-        # 'HOST': 'localhost',
-        'HOST': 'boltabacusdb.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
-        # 'HOST': 'boltabacus.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
+        'HOST': 'localhost',
         'PORT': '5432'
     }
 }

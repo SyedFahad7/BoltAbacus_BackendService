@@ -472,6 +472,18 @@ def IdExtraction(token):
 def ConvertToString(questionJson):
     numbers = questionJson['numbers']
     operator = questionJson['operator']
+    
+    # Handle single-number operations with descriptive text
+    if operator == '√':
+        return f"Square root of {numbers[0]}"
+    elif operator == '∛':
+        return f"Cube root of {numbers[0]}"
+    elif operator == '²':
+        return f"Square of {numbers[0]}"
+    elif operator == '³':
+        return f"Cube of {numbers[0]}"
+    
+    # Handle two-number operations
     if operator == '*' or operator == '/':
         return str(numbers[0]) + operator + str(numbers[1])
     else:
@@ -2336,6 +2348,52 @@ class DeleteStudentPracticeQuestion(APIView):
             return Response({Constants.JSON_MESSAGE: "Deleted the pratice question"}, status=status.HTTP_200_OK)
         
         except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeleteQuestion(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            print("DeleteQuestion: Request received")
+            print("DeleteQuestion: Request data:", request.data)
+            print("DeleteQuestion: Request headers:", request.headers)
+            
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                print("DeleteQuestion: Token extraction error:", repr(e))
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            print("DeleteQuestion: User ID:", userId)
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                print("DeleteQuestion: User not found")
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            if user.role != Constants.SUB_ADMIN and user.role != Constants.ADMIN:
+                print("DeleteQuestion: User is not admin, role:", user.role)
+                return Response({Constants.JSON_MESSAGE: "User is not an admin"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            requestQuestionId = request.data[Constants.QUESTION_ID]
+            print("DeleteQuestion: Question ID to delete:", requestQuestionId)
+            
+            question = QuizQuestions.objects.filter(questionId=requestQuestionId).first()
+            if question is None:
+                print("DeleteQuestion: Question not found")
+                return Response({Constants.JSON_MESSAGE: "Question already deleted or doesn't exist"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            print("DeleteQuestion: Question found, deleting...")
+            question.delete()
+            print("DeleteQuestion: Question deleted successfully")
+            return Response({Constants.JSON_MESSAGE: "Question deleted successfully"}, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            print("DeleteQuestion: Exception occurred:", repr(e))
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
