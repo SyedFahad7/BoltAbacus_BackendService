@@ -30,16 +30,17 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    'Authentication.apps.AuthenticationConfig',
-    'rest_framework',
-    "rest_framework.authtoken",
-    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'Authentication',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -51,6 +52,22 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'AUTH-TOKEN',
 ]
 
 ROOT_URLCONF = 'BoltAbacus.urls'
@@ -84,7 +101,7 @@ DATABASES = {
         'NAME': 'boltabacusdb',
         'USER': 'postgres',
         'PASSWORD': '12345678',
-        'HOST': 'localhost',
+        'HOST': 'boltabacusdb.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
         'PORT': '5432'
     }
 }
@@ -147,15 +164,15 @@ REST_FRAMEWORK = {
 }
 
 # allows frontend to access the app
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True # This line is removed as per the new_code
 # allows the frontend to get cookies
-CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOW_CREDENTIALS = True # This line is removed as per the new_code
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_HEADERS = (
-    *default_headers,
-    "AUTH-TOKEN",
-)
+# CORS_ALLOW_HEADERS = ( # This line is removed as per the new_code
+#     *default_headers,
+#     "auth-token",
+# )
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
@@ -163,3 +180,18 @@ EMAIL_PORT = 587
 EMAIL_HOST_PASSWORD = 'deamwhhkmfigbihz'
 EMAIL_HOST_USER = 'sankeerth@boltabacus.com'
 EMAIL_USE_TLS = True
+
+# Django Channels Configuration
+ASGI_APPLICATION = 'BoltAbacus.asgi.application'
+
+# Channel Layers for WebSocket support
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        # For production, use Redis:
+        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # 'CONFIG': {
+        #     "hosts": [('127.0.0.1', 6379)],
+        # },
+    },
+}

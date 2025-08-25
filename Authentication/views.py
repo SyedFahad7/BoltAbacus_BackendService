@@ -1,4 +1,5 @@
 import datetime
+from django.utils import timezone
 import random
 import time
 import jwt
@@ -14,7 +15,10 @@ from Authentication.models import (UserDetails, Student,
                                    Batch, Curriculum,
                                    TopicDetails, QuizQuestions,
                                    Progress, Teacher, OrganizationTag,
-                                   PracticeQuestions)
+                                   PracticeQuestions, UserExperience, PVPRoom, 
+                                   PVPRoomPlayer, PVPGameSession, PVPPlayerAnswer, 
+                                   PVPGameResult, UserStreak, UserCoins, UserAchievement)
+from rest_framework.decorators import api_view
 
 
 # ------------ Student Related APIs -----------------------
@@ -51,6 +55,7 @@ class SignIn(APIView):
                 secretKey = Constants.SECRET_KEY
                 loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
                 response = Response({
+                    "userId": user[Constants.USER_ID],
                     Constants.EMAIL: user[Constants.EMAIL],
                     Constants.ROLE: user[Constants.ROLE],
                     Constants.FIRST_NAME: user[Constants.FIRST_NAME],
@@ -495,6 +500,277 @@ def ConvertToString(questionJson):
                 question += str(numbers[i])
 
         return question
+
+def generatePVPQuestion(difficulty_level='medium'):
+    """
+    Generate a math question based on difficulty level for PVP games.
+    
+    Difficulty levels:
+    - Easy: 2-3 operands, basic operations (+, -, ×, ÷)
+    - Medium: 3-4 operands, includes squares (²)
+    - Hard: 4-5 operands, includes cubes (³), square roots (√)
+    - Expert: 5-6+ operands, includes cube roots (∛), complex combinations
+    """
+    import random
+    
+    if difficulty_level == 'easy':
+        # Easy: 2-3 operands, basic operations
+        num_operands = random.randint(2, 3)
+        operations = ['+', '-', '*', '/']
+        
+        numbers = []
+        for i in range(num_operands):
+            if i == 0:
+                numbers.append(random.randint(1, 50))
+            else:
+                numbers.append(random.randint(1, 20))
+        
+        # Generate question string
+        question_str = str(numbers[0])
+        answer = numbers[0]
+        
+        for i in range(1, num_operands):
+            op = random.choice(operations)
+            num = numbers[i]
+            
+            if op == '+':
+                answer += num
+                question_str += f" + {num}"
+            elif op == '-':
+                # Ensure subtraction doesn't go negative
+                if answer <= num:
+                    num = answer // 2
+                answer -= num
+                question_str += f" - {num}"
+            elif op == '*':
+                answer *= num
+                question_str += f" × {num}"
+            elif op == '/':
+                # Ensure division results in whole number
+                if answer % num != 0:
+                    # Find a divisor that works
+                    divisors = []
+                    for d in range(1, min(answer, 20) + 1):
+                        if answer % d == 0:
+                            divisors.append(d)
+                    if divisors:
+                        num = random.choice(divisors)
+                    else:
+                        num = 1
+                answer //= num
+                question_str += f" ÷ {num}"
+        
+        # Ensure answer is positive
+        if answer <= 0:
+            answer = abs(answer) + 1
+        
+        return {
+            'question': f"{question_str} = ?",
+            'answer': answer,
+            'numbers': numbers,
+            'operations': operations[:num_operands-1]
+        }
+    
+    elif difficulty_level == 'medium':
+        # Medium: 3-4 operands, includes squares
+        num_operands = random.randint(3, 4)
+        operations = ['+', '-', '*', '/', '²']
+        
+        numbers = []
+        for i in range(num_operands):
+            if i == 0:
+                numbers.append(random.randint(1, 30))
+            else:
+                numbers.append(random.randint(1, 15))
+        
+        question_str = str(numbers[0])
+        answer = numbers[0]
+        
+        for i in range(1, num_operands):
+            op = random.choice(operations)
+            num = numbers[i]
+            
+            if op == '²':
+                # Square the current answer
+                answer = answer ** 2
+                question_str += "²"
+            elif op == '+':
+                answer += num
+                question_str += f" + {num}"
+            elif op == '-':
+                if answer <= num:
+                    num = answer // 2
+                answer -= num
+                question_str += f" - {num}"
+            elif op == '*':
+                answer *= num
+                question_str += f" × {num}"
+            elif op == '/':
+                if answer % num != 0:
+                    divisors = []
+                    for d in range(1, min(answer, 15) + 1):
+                        if answer % d == 0:
+                            divisors.append(d)
+                    if divisors:
+                        num = random.choice(divisors)
+                    else:
+                        num = 1
+                answer //= num
+                question_str += f" ÷ {num}"
+        
+        if answer <= 0:
+            answer = abs(answer) + 1
+        
+        return {
+            'question': f"{question_str} = ?",
+            'answer': answer,
+            'numbers': numbers,
+            'operations': operations[:num_operands-1]
+        }
+    
+    elif difficulty_level == 'hard':
+        # Hard: 4-5 operands, includes cubes and square roots
+        num_operands = random.randint(4, 5)
+        operations = ['+', '-', '*', '/', '²', '³', '√']
+        
+        numbers = []
+        for i in range(num_operands):
+            if i == 0:
+                numbers.append(random.randint(1, 25))
+            else:
+                numbers.append(random.randint(1, 12))
+        
+        question_str = str(numbers[0])
+        answer = numbers[0]
+        
+        for i in range(1, num_operands):
+            op = random.choice(operations)
+            num = numbers[i]
+            
+            if op == '²':
+                answer = answer ** 2
+                question_str += "²"
+            elif op == '³':
+                answer = answer ** 3
+                question_str += "³"
+            elif op == '√':
+                # Ensure square root results in whole number
+                perfect_square = int(answer ** 0.5) ** 2
+                if perfect_square == answer:
+                    answer = int(answer ** 0.5)
+                    question_str += "√"
+                else:
+                    # If not perfect square, use multiplication
+                    answer *= num
+                    question_str += f" × {num}"
+            elif op == '+':
+                answer += num
+                question_str += f" + {num}"
+            elif op == '-':
+                if answer <= num:
+                    num = answer // 2
+                answer -= num
+                question_str += f" - {num}"
+            elif op == '*':
+                answer *= num
+                question_str += f" × {num}"
+            elif op == '/':
+                if answer % num != 0:
+                    divisors = []
+                    for d in range(1, min(answer, 12) + 1):
+                        if answer % d == 0:
+                            divisors.append(d)
+                    if divisors:
+                        num = random.choice(divisors)
+                    else:
+                        num = 1
+                answer //= num
+                question_str += f" ÷ {num}"
+        
+        if answer <= 0:
+            answer = abs(answer) + 1
+        
+        return {
+            'question': f"{question_str} = ?",
+            'answer': answer,
+            'numbers': numbers,
+            'operations': operations[:num_operands-1]
+        }
+    
+    else:  # expert
+        # Expert: 5-6+ operands, complex combinations including cube roots
+        num_operands = random.randint(5, 6)
+        operations = ['+', '-', '*', '/', '²', '³', '√', '∛']
+        
+        numbers = []
+        for i in range(num_operands):
+            if i == 0:
+                numbers.append(random.randint(1, 20))
+            else:
+                numbers.append(random.randint(1, 10))
+        
+        question_str = str(numbers[0])
+        answer = numbers[0]
+        
+        for i in range(1, num_operands):
+            op = random.choice(operations)
+            num = numbers[i]
+            
+            if op == '²':
+                answer = answer ** 2
+                question_str += "²"
+            elif op == '³':
+                answer = answer ** 3
+                question_str += "³"
+            elif op == '√':
+                perfect_square = int(answer ** 0.5) ** 2
+                if perfect_square == answer:
+                    answer = int(answer ** 0.5)
+                    question_str += "√"
+                else:
+                    answer *= num
+                    question_str += f" × {num}"
+            elif op == '∛':
+                perfect_cube = int(answer ** (1/3)) ** 3
+                if perfect_cube == answer:
+                    answer = int(answer ** (1/3))
+                    question_str += "∛"
+                else:
+                    answer *= num
+                    question_str += f" × {num}"
+            elif op == '+':
+                answer += num
+                question_str += f" + {num}"
+            elif op == '-':
+                if answer <= num:
+                    num = answer // 2
+                answer -= num
+                question_str += f" - {num}"
+            elif op == '*':
+                answer *= num
+                question_str += f" × {num}"
+            elif op == '/':
+                if answer % num != 0:
+                    divisors = []
+                    for d in range(1, min(answer, 10) + 1):
+                        if answer % d == 0:
+                            divisors.append(d)
+                    if divisors:
+                        num = random.choice(divisors)
+                    else:
+                        num = 1
+                answer //= num
+                question_str += f" ÷ {num}"
+        
+        if answer <= 0:
+            answer = abs(answer) + 1
+        
+        return {
+            'question': f"{question_str} = ?",
+            'answer': answer,
+            'numbers': numbers,
+            'operations': operations[:num_operands-1]
+        }
 
 
 # -------------------- Admin Related APIs ----------------------
@@ -2445,4 +2721,891 @@ def ifPracticeQuestionsAlreadyExists(data, userId):
 def temp():
     print()
 
+# PVP and Experience API Views
+class CreatePVPRoom(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            if user.role != Constants.STUDENT:
+                return Response({Constants.JSON_MESSAGE: "Only students can create PVP rooms"}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Generate unique room code
+            import random
+            import string
+            
+            def generate_room_code():
+                while True:
+                    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    if not PVPRoom.objects.filter(room_id=code).exists():
+                        return code
+            
+            room_code = generate_room_code()
+            
+            # Create room
+            room = PVPRoom.objects.create(
+                room_id=room_code,
+                creator=user,
+                max_players=request.data.get('max_players', 2),
+                number_of_questions=request.data.get('number_of_questions', 10),
+                time_per_question=request.data.get('time_per_question', 30),
+                level_id=request.data.get('level_id', 1),
+                class_id=request.data.get('class_id', 1),
+                topic_id=request.data.get('topic_id', 1)
+            )
+            
+            # Add creator as first player
+            PVPRoomPlayer.objects.create(
+                room=room,
+                player=user,
+                status='joined'
+            )
+            
+            room.current_players = 1
+            room.save()
+            
+            return Response({
+                'success': True,
+                'room_id': room.room_id,
+                'message': 'Room created successfully'
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class JoinPVPRoom(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            if user.role != Constants.STUDENT:
+                return Response({Constants.JSON_MESSAGE: "Only students can join PVP rooms"}, status=status.HTTP_403_FORBIDDEN)
+            
+            room_id = request.data.get('room_id')
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            if room.status != 'waiting':
+                return Response({Constants.JSON_MESSAGE: "Room is not accepting players"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if room.current_players >= room.max_players:
+                return Response({Constants.JSON_MESSAGE: "Room is full"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if player already in room
+            existing_player = PVPRoomPlayer.objects.filter(room=room, player=user).first()
+            if existing_player:
+                return Response({Constants.JSON_MESSAGE: "You are already in this room"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Add player to room
+            PVPRoomPlayer.objects.create(
+                room=room,
+                player=user,
+                status='joined'
+            )
+            
+            room.current_players += 1
+            room.save()
+            
+            return Response({
+                'success': True,
+                'room_id': room.room_id,
+                'message': 'Joined room successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPVPRoomDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get players in room
+            players = []
+            for player in room.players.all():
+                players.append({
+                    'user_id': player.player.userId,
+                    'name': f"{player.player.firstName} {player.player.lastName}",
+                    'status': player.status,
+                    'is_ready': player.is_ready,
+                    'score': player.score
+                })
+            
+            room_data = {
+                'room_id': room.room_id,
+                'creator_id': room.creator.userId,
+                'creator_name': f"{room.creator.firstName} {room.creator.lastName}",
+                'status': room.status,
+                'max_players': room.max_players,
+                'current_players': room.current_players,
+                'number_of_questions': room.number_of_questions,
+                'time_per_question': room.time_per_question,
+                'level_id': room.level_id,
+                'class_id': room.class_id,
+                'topic_id': room.topic_id,
+                'created_at': room.created_at,
+                'players': players
+            }
+            
+            return Response({
+                'success': True,
+                'data': room_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetUserExperience(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            user_exp, created = UserExperience.objects.get_or_create(
+                user=user,
+                defaults={'experience_points': 0, 'level': 1}
+            )
+            
+            exp_data = {
+                'user_id': user.userId,
+                'experience_points': user_exp.experience_points,
+                'level': user_exp.level,
+                'xp_to_next_level': 100 - (user_exp.experience_points % 100)
+            }
+            
+            return Response({
+                'success': True,
+                'data': exp_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPVPGameResult(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            game_result = PVPGameResult.objects.filter(room=room).first()
+            if not game_result:
+                return Response({Constants.JSON_MESSAGE: "Game result not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get all players' final scores
+            players_data = []
+            for player in room.players.all():
+                players_data.append({
+                    'user_id': player.player.userId,
+                    'name': f"{player.player.firstName} {player.player.lastName}",
+                    'score': player.score,
+                    'correct_answers': player.correct_answers,
+                    'total_time': player.total_time,
+                    'is_winner': game_result.winner == player.player if game_result.winner else False
+                })
+            
+            result_data = {
+                'room_id': room.room_id,
+                'winner_id': game_result.winner.userId if game_result.winner else None,
+                'winner_name': f"{game_result.winner.firstName} {game_result.winner.lastName}" if game_result.winner else None,
+                'winner_score': game_result.winner_score,
+                'winner_correct_answers': game_result.winner_correct_answers,
+                'winner_time': game_result.winner_time,
+                'experience_awarded': game_result.experience_awarded,
+                'players': players_data,
+                'finished_at': room.finished_at
+            }
+            
+            return Response({
+                'success': True,
+                'data': result_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CreatePVPRoom(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Generate unique room code
+            import random
+            import string
+            room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            
+            # Ensure room code is unique
+            while PVPRoom.objects.filter(room_id=room_code).exists():
+                room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            
+            # Create room
+            room = PVPRoom.objects.create(
+                room_id=room_code,
+                creator=user,
+                max_players=request.data.get('max_players', 2),
+                number_of_questions=request.data.get('number_of_questions', 10),
+                time_per_question=request.data.get('time_per_question', 30),
+                difficulty_level=request.data.get('difficulty_level', 'medium'),
+                status='waiting'
+            )
+            
+            # Add creator as first player
+            PVPRoomPlayer.objects.create(
+                room=room,
+                player=user,
+                is_ready=True,
+                score=0,
+                correct_answers=0,
+                total_time=0
+            )
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'room_id': room.room_id,
+                    'creator_id': user.userId,
+                    'max_players': room.max_players,
+                    'number_of_questions': room.number_of_questions,
+                    'time_per_question': room.time_per_question,
+                    'status': room.status
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class JoinPVPRoom(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_code = request.data.get('room_code')
+            if not room_code:
+                return Response({Constants.JSON_MESSAGE: "Room code is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_code).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            if room.status != 'waiting':
+                return Response({Constants.JSON_MESSAGE: "Room is not accepting players"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user is already in the room
+            if PVPRoomPlayer.objects.filter(room=room, player=user).exists():
+                return Response({Constants.JSON_MESSAGE: "You are already in this room"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if room is full
+            current_players = room.players.count()
+            if current_players >= room.max_players:
+                return Response({Constants.JSON_MESSAGE: "Room is full"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Add player to room (all players are ready by default)
+            PVPRoomPlayer.objects.create(
+                room=room,
+                player=user,
+                is_ready=True,
+                score=0,
+                correct_answers=0,
+                total_time=0
+            )
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'room_id': room.room_id,
+                    'message': 'Successfully joined room'
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPVPRoomDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get all players in the room
+            players_data = []
+            for player in room.players.all():
+                players_data.append({
+                    'player': {
+                        'userId': player.player.userId,
+                        'firstName': player.player.firstName,
+                        'lastName': player.player.lastName
+                    },
+                    'is_ready': player.is_ready,
+                    'score': player.score,
+                    'correct_answers': player.correct_answers,
+                    'total_time': player.total_time
+                })
+            
+            room_data = {
+                'room_id': room.room_id,
+                'creator': {
+                    'userId': room.creator.userId,
+                    'firstName': room.creator.firstName,
+                    'lastName': room.creator.lastName
+                },
+                'max_players': room.max_players,
+                'current_players': room.players.count(),
+                'number_of_questions': room.number_of_questions,
+                'time_per_question': room.time_per_question,
+                'status': room.status,
+                'players': players_data,
+                'created_at': room.created_at
+            }
+            
+            return Response({
+                'success': True,
+                'data': room_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SetPlayerReady(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            is_ready = request.data.get('is_ready', False)
+            
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Find the player in the room
+            player = PVPRoomPlayer.objects.filter(room=room, player=user).first()
+            if not player:
+                return Response({Constants.JSON_MESSAGE: "You are not in this room"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update ready status
+            player.is_ready = is_ready
+            player.save()
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'message': f"Ready status updated to {is_ready}",
+                    'is_ready': is_ready
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StartPVPGame(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if user is the creator
+            if room.creator != user:
+                return Response({Constants.JSON_MESSAGE: "Only the room creator can start the game"}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Check if there are at least 2 players
+            players = room.players.all()
+            if not players.exists():
+                return Response({Constants.JSON_MESSAGE: "No players in room"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if players.count() < 2:
+                return Response({Constants.JSON_MESSAGE: "Need at least 2 players to start the game"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update room status to active
+            room.status = 'active'
+            room.save()
+            
+            # Create game session
+            game_session = PVPGameSession.objects.create(
+                room=room,
+                current_question_index=0,
+                is_active=True
+            )
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'message': 'Game started successfully',
+                    'game_session_id': game_session.id,
+                    'room_status': room.status
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SubmitPVPGameResult(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            score = request.data.get('score', 0)
+            correct_answers = request.data.get('correct_answers', 0)
+            total_time = request.data.get('total_time', 0)
+            
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Find the player in the room
+            player = PVPRoomPlayer.objects.filter(room=room, player=user).first()
+            if not player:
+                return Response({Constants.JSON_MESSAGE: "You are not in this room"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update player's game results
+            player.score = score
+            player.correct_answers = correct_answers
+            player.total_time = total_time
+            player.status = 'finished'  # Mark player as finished
+            player.finished_at = timezone.now()
+            player.save()
+            
+            # Check if all players have finished
+            all_players = room.players.all()
+            finished_players = all_players.filter(status='finished')  # Players who have finished the game
+            
+            print(f"Debug: Room {room_id} - Total players: {all_players.count()}, Finished players: {finished_players.count()}")
+            for p in all_players:
+                print(f"Debug: Player {p.player.firstName} - Status: {p.status}, Score: {p.score}")
+            
+            if finished_players.count() == all_players.count():
+                # All players finished, determine winner
+                # Check if it's a draw (all players have same score)
+                scores = [p.score for p in finished_players]
+                is_draw = len(set(scores)) == 1 and len(scores) > 1
+                
+                if is_draw:
+                    # It's a draw - all players get 25 XP
+                    winner = None
+                    experience_awarded = 25
+                    
+                    # Award 25 XP to all players
+                    for player in all_players:
+                        user_exp, created = UserExperience.objects.get_or_create(
+                            user=player.player,
+                            defaults={'experience_points': 0, 'level': 1}
+                        )
+                        user_exp.experience_points += 25
+                        user_exp.level = (user_exp.experience_points // 100) + 1
+                        user_exp.save()
+                    
+                    # Create game result for draw
+                    game_result = PVPGameResult.objects.create(
+                        room=room,
+                        winner=None,  # No winner in draw
+                        winner_score=scores[0],  # All have same score
+                        winner_correct_answers=finished_players.first().correct_answers,
+                        winner_time=finished_players.first().total_time,
+                        experience_awarded=25
+                    )
+                    
+                    result_data = {
+                        'is_winner': None,  # No winner in draw
+                        'is_draw': True,
+                        'winner_name': None,
+                        'winner_score': scores[0],
+                        'experience_awarded': 25,
+                        'total_players': all_players.count()
+                    }
+                else:
+                    # Normal game - determine winner
+                    winner = finished_players.order_by('-score', 'total_time').first()
+                    
+                    # Create game result
+                    game_result = PVPGameResult.objects.create(
+                        room=room,
+                        winner=winner.player if winner else None,
+                        winner_score=winner.score if winner else 0,
+                        winner_correct_answers=winner.correct_answers if winner else 0,
+                        winner_time=winner.total_time if winner else 0,
+                        experience_awarded=50 if winner else 10  # Winner gets 50 XP, others get 10 XP
+                    )
+                    
+                    # Award experience to winner
+                    if winner:
+                        user_exp, created = UserExperience.objects.get_or_create(
+                            user=winner.player,
+                            defaults={'experience_points': 0, 'level': 1}
+                        )
+                        user_exp.experience_points += 50
+                        user_exp.level = (user_exp.experience_points // 100) + 1
+                        user_exp.save()
+                    
+                    # Award experience to all participants
+                    for player in all_players:
+                        if player.player != winner.player:
+                            user_exp, created = UserExperience.objects.get_or_create(
+                                user=player.player,
+                                defaults={'experience_points': 0, 'level': 1}
+                            )
+                            user_exp.experience_points += 10
+                            user_exp.level = (user_exp.experience_points // 100) + 1
+                            user_exp.save()
+                    
+                    result_data = {
+                        'is_winner': winner.player == user if winner else False,
+                        'is_draw': False,
+                        'winner_name': f"{winner.player.firstName} {winner.player.lastName}" if winner else None,
+                        'winner_score': winner.score if winner else 0,
+                        'experience_awarded': 50 if winner and winner.player == user else 10,
+                        'total_players': all_players.count()
+                    }
+                
+                # Update room status to finished (for both draw and normal game)
+                room.status = 'finished'
+                room.finished_at = timezone.now()
+                room.save()
+            else:
+                # Not all players finished yet
+                result_data = {
+                    'is_winner': None,
+                    'winner_name': None,
+                    'winner_score': 0,
+                    'experience_awarded': 0,
+                    'total_players': all_players.count(),
+                    'finished_players': finished_players.count()
+                }
+            
+            return Response({
+                'success': True,
+                'data': result_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # Create your views here.
+
+class UpdatePlayerProgress(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """Update player progress during PVP game for real-time leaderboard"""
+        print(f"🔵 UpdatePlayerProgress called with data: {request.data}")
+        print(f"🔵 Headers: {request.headers}")
+        
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get('auth-token')
+            print(f"🔵 Auth token: {auth_token[:20] if auth_token else 'None'}...")
+            
+            if not auth_token:
+                print("❌ No auth token found")
+                return Response({
+                    'success': False,
+                    'message': 'Authentication token required'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+                print(f"🔵 Decoded user_id: {user_id}")
+            except jwt.ExpiredSignatureError:
+                print("❌ Token expired")
+                return Response({
+                    'success': False,
+                    'message': 'Token expired'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError as e:
+                print(f"❌ Invalid token: {e}")
+                return Response({
+                    'success': False,
+                    'message': 'Invalid token'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user
+            try:
+                user = UserDetails.objects.get(userId=user_id)
+                print(f"🔵 Found user: {user.firstName}")
+            except UserDetails.DoesNotExist:
+                print(f"❌ User not found with ID: {user_id}")
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get request data
+            room_id = request.data.get('room_id')
+            score = request.data.get('score', 0)
+            correct_answers = request.data.get('correct_answers', 0)
+            current_question = request.data.get('current_question', 1)
+            
+            print(f"🔵 Request data - Room: {room_id}, Score: {score}, Correct: {correct_answers}, Question: {current_question}")
+            
+            if not room_id:
+                print("❌ No room_id provided")
+                return Response({
+                    'success': False,
+                    'message': 'Room ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get room
+            try:
+                room = PVPRoom.objects.get(room_id=room_id)
+                print(f"🔵 Found room: {room.room_id}")
+            except PVPRoom.DoesNotExist:
+                print(f"❌ Room not found: {room_id}")
+                return Response({
+                    'success': False,
+                    'message': 'Room not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get or create player session
+            player_session, created = PVPRoomPlayer.objects.get_or_create(
+                room=room,
+                player=user,
+                defaults={
+                    'score': score,
+                    'correct_answers': correct_answers,
+                    'total_time': 0,
+                    'status': 'playing'
+                }
+            )
+            
+            if not created:
+                # Update existing session
+                print(f"🔵 Updating existing player session - Old score: {player_session.score}, New score: {score}")
+                player_session.score = score
+                player_session.correct_answers = correct_answers
+                player_session.save()
+            else:
+                print(f"🔵 Created new player session with score: {score}")
+            
+            print(f"✅ Player {user.firstName} progress updated - Score: {score}, Correct: {correct_answers}")
+            
+            return Response({
+                'success': True,
+                'message': 'Player progress updated successfully',
+                'data': {
+                    'score': score,
+                    'correct_answers': correct_answers,
+                    'current_question': current_question
+                }
+            })
+            
+        except Exception as e:
+            print(f"❌ Error updating player progress: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'success': False,
+                'message': f'Error updating player progress: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GetPVPLeaderboard(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Get top 10 players by experience points
+            top_players = UserExperience.objects.select_related('user').order_by('-experience_points')[:10]
+            
+            leaderboard_data = []
+            for rank, player in enumerate(top_players, 1):
+                leaderboard_data.append({
+                    'rank': rank,
+                    'user_id': player.user.userId,
+                    'name': f"{player.user.firstName} {player.user.lastName}",
+                    'experience_points': player.experience_points,
+                    'level': player.level
+                })
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'leaderboard': leaderboard_data,
+                    'total_players': UserExperience.objects.count()
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error fetching leaderboard: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

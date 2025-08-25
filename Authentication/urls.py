@@ -62,6 +62,18 @@ urlpatterns = [
     path('getStudentPracticeQuestions/', views.GetStudentPracticeQuestions.as_view()),
     path('getStudentPracticeQuestionsStudent/', views.GetStudentPracticeQuestionsStudent.as_view()),
     path('deleteStudentPracticeQuestion/', views.DeleteStudentPracticeQuestion.as_view()),
-    path('deleteQuestion/', views.DeleteQuestion.as_view())
+    path('deleteQuestion/', views.DeleteQuestion.as_view()),
+
+    # PVP and Experience endpoints
+    path('createPVPRoom/', views.CreatePVPRoom.as_view()),
+    path('joinPVPRoom/', views.JoinPVPRoom.as_view()),
+    path('getPVPRoomDetails/', views.GetPVPRoomDetails.as_view()),
+    path('setPlayerReady/', views.SetPlayerReady.as_view()),
+    path('startPVPGame/', views.StartPVPGame.as_view()),
+    path('submitPVPGameResult/', views.SubmitPVPGameResult.as_view()),
+    path('getUserExperience/', views.GetUserExperience.as_view()),
+    path('getPVPGameResult/', views.GetPVPGameResult.as_view()),
+    path('updatePlayerProgress/', views.UpdatePlayerProgress.as_view()),
+    path('getPVPLeaderboard/', views.GetPVPLeaderboard.as_view()),
 
 ]
