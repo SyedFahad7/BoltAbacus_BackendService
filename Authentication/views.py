@@ -2911,15 +2911,25 @@ class GetUserExperience(APIView):
 
     def post(self, request):
         try:
-            requestUserToken = request.headers[Constants.TOKEN_HEADER]
-            try:
-                userId = IdExtraction(requestUserToken)
-                if isinstance(userId, Exception):
-                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
-            except Exception as e:
-                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            # Extract token from headers using .get() to avoid KeyError
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
             
-            user = UserDetails.objects.filter(userId=userId).first()
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
             
@@ -2949,15 +2959,25 @@ class GetPVPGameResult(APIView):
 
     def post(self, request):
         try:
-            requestUserToken = request.headers[Constants.TOKEN_HEADER]
-            try:
-                userId = IdExtraction(requestUserToken)
-                if isinstance(userId, Exception):
-                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
-            except Exception as e:
-                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            # Extract token from headers using .get() to avoid KeyError
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
             
-            user = UserDetails.objects.filter(userId=userId).first()
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
             
@@ -3609,3 +3629,170 @@ class GetPVPLeaderboard(APIView):
                 'success': False,
                 'message': f'Error fetching leaderboard: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Streak Management APIs
+class GetUserStreak(APIView):
+    """Get user's current streak information"""
+    
+    def get(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user
+            try:
+                user = UserDetails.objects.get(userId=user_id)
+            except UserDetails.DoesNotExist:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, 
+                              status=status.HTTP_404_NOT_FOUND)
+            
+            # Get or create user streak using the enhanced method
+            try:
+                user_streak, created = UserStreak.get_or_create_streak(user)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: f"Error accessing streak data: {str(e)}"}, 
+                              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({
+                'currentStreak': user_streak.current_streak,
+                'maxStreak': user_streak.max_streak,
+                'lastActivityDate': user_streak.last_activity_date.isoformat() if user_streak.last_activity_date else None,
+                'createdAt': user_streak.created_at.isoformat(),
+                'updatedAt': user_streak.updated_at.isoformat(),
+                'streakCreated': created
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error fetching streak: {str(e)}"}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UpdateUserStreak(APIView):
+    """Update user's streak (increment for daily activity)"""
+    
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user
+            try:
+                user = UserDetails.objects.get(userId=user_id)
+            except UserDetails.DoesNotExist:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, 
+                              status=status.HTTP_404_NOT_FOUND)
+            
+            # Get or create user streak using the enhanced method
+            try:
+                user_streak, created = UserStreak.get_or_create_streak(user)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: f"Error accessing streak data: {str(e)}"}, 
+                              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Update streak with proper error handling
+            try:
+                new_streak = user_streak.update_streak()
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: f"Error updating streak: {str(e)}"}, 
+                              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({
+                'currentStreak': user_streak.current_streak,
+                'maxStreak': user_streak.max_streak,
+                'lastActivityDate': user_streak.last_activity_date.isoformat() if user_streak.last_activity_date else None,
+                'streakUpdated': True,
+                'newStreak': new_streak,
+                'streakCreated': created
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error updating streak: {str(e)}"}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ResetUserStreak(APIView):
+    """Reset user's streak to 0"""
+    
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user
+            try:
+                user = UserDetails.objects.get(userId=user_id)
+            except UserDetails.DoesNotExist:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, 
+                              status=status.HTTP_404_NOT_FOUND)
+            
+            # Get or create user streak using the enhanced method
+            try:
+                user_streak, created = UserStreak.get_or_create_streak(user)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: f"Error accessing streak data: {str(e)}"}, 
+                              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Reset streak using the enhanced method
+            try:
+                user_streak.reset_streak()
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: f"Error resetting streak: {str(e)}"}, 
+                              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({
+                'currentStreak': user_streak.current_streak,
+                'maxStreak': user_streak.max_streak,
+                'lastActivityDate': user_streak.last_activity_date.isoformat() if user_streak.last_activity_date else None,
+                'streakReset': True,
+                'streakCreated': created
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error resetting streak: {str(e)}"}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)

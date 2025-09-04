@@ -23,9 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-0g1c($2c113=8r=hih*ymw^=-2yk^gzj*2ifd-rb5m$$#!#483'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', '.render.com', '.onrender.com']
 
 # Application definition
 
@@ -95,15 +95,13 @@ WSGI_APPLICATION = 'BoltAbacus.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'boltabacusdb',
-        'USER': 'postgres',
-        'PASSWORD': '12345678',
-        'HOST': 'boltabacusdb.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
-        'PORT': '5432'
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', 'postgresql://postgres:12345678@boltabacusdb.cxoohqadjgtz.ap-south-1.rds.amazonaws.com:5432/boltabacusdb'),
+        conn_max_age=600
+    )
 }
 
 # AUTH_USER_MODEL = "Authentication.TopicDetails"

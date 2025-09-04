@@ -222,14 +222,91 @@ class PVPGameResult(models.Model):
 
 # Additional models for future features
 class UserStreak(models.Model):
-    user = models.OneToOneField(UserDetails, to_field='userId', on_delete=models.CASCADE)
-    current_streak = models.IntegerField(default=0)
-    max_streak = models.IntegerField(default=0)
-    last_activity_date = models.DateField(auto_now=True)
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE, related_name='streak')
+    current_streak = models.IntegerField(default=0, db_index=True)
+    max_streak = models.IntegerField(default=0, db_index=True)
+    last_activity_date = models.DateField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user',)
+        db_table = 'Authentication_userstreak'
+        indexes = [
+            models.Index(fields=['user', 'last_activity_date']),
+            models.Index(fields=['current_streak']),
+            models.Index(fields=['max_streak']),
+        ]
 
     def __str__(self):
-        return f"{self.user.firstName} - {self.current_streak} day streak"
+        return f"Streak for {self.user.firstName} {self.user.lastName}: {self.current_streak} days"
+
+    def update_streak(self, activity_date=None):
+        """Update streak based on activity date with improved logic"""
+        if activity_date is None:
+            activity_date = date.today()
+        
+        # Handle timezone-aware dates
+        if hasattr(activity_date, 'date'):
+            activity_date = activity_date.date()
+        
+        if self.last_activity_date is None:
+            # First time activity
+            self.current_streak = 1
+            self.max_streak = 1
+            self.last_activity_date = activity_date
+        else:
+            # Check if it's a consecutive day
+            days_diff = (activity_date - self.last_activity_date).days
+            
+            if days_diff == 1:
+                # Consecutive day
+                self.current_streak += 1
+                self.max_streak = max(self.max_streak, self.current_streak)
+            elif days_diff == 0:
+                # Same day, no change needed
+                return self.current_streak
+            elif days_diff < 0:
+                # Future date (shouldn't happen in normal usage)
+                return self.current_streak
+            else:
+                # Streak broken (more than 1 day gap), start new streak
+                self.current_streak = 1
+            
+            self.last_activity_date = activity_date
+        
+        self.save(update_fields=['current_streak', 'max_streak', 'last_activity_date', 'updated_at'])
+        return self.current_streak
+
+    def reset_streak(self):
+        """Reset the current streak to 0"""
+        self.current_streak = 0
+        self.last_activity_date = None
+        self.save(update_fields=['current_streak', 'last_activity_date', 'updated_at'])
+        return self.current_streak
+
+    @classmethod
+    def get_or_create_streak(cls, user):
+        """Get or create streak for user with proper error handling"""
+        try:
+            streak, created = cls.objects.get_or_create(user=user)
+            return streak, created
+        except Exception as e:
+            # Log the error for debugging
+            print(f"Error getting/creating streak for user {user.userId}: {e}")
+            # Try to get existing streak
+            try:
+                streak = cls.objects.filter(user=user).first()
+                if streak:
+                    return streak, False
+                else:
+                    # Create new streak if none exists
+                    streak = cls.objects.create(user=user)
+                    return streak, True
+            except Exception as e2:
+                print(f"Critical error creating streak for user {user.userId}: {e2}")
+                raise
 
 
 class UserCoins(models.Model):

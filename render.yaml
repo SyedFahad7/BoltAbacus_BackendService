@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: boltabacus-backend
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn BoltAbacus.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEBUG
+        value: False
+    databases:
+      - name: boltabacus-db
+        databaseName: boltabacusdb
+        user: boltabacus

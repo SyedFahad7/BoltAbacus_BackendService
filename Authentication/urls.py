@@ -76,4 +76,9 @@ urlpatterns = [
     path('updatePlayerProgress/', views.UpdatePlayerProgress.as_view()),
     path('getPVPLeaderboard/', views.GetPVPLeaderboard.as_view()),
 
+    # Streak APIs
+    path('streak/', views.GetUserStreak.as_view()),
+    path('streak/update/', views.UpdateUserStreak.as_view()),
+    path('streak/reset/', views.ResetUserStreak.as_view()),
+
 ]
