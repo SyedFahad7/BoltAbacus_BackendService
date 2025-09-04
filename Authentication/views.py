@@ -105,13 +105,28 @@ class CurrentLevelsV2(APIView):
 
     def get(self, request):
         try:
-            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+            
             try:
-                requestUserId = IdExtraction(requestUserToken)
-                if isinstance(requestUserId, Exception):
-                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+                payload = jwt.decode(auth_token, Constants.JWT_SECRET_KEY, algorithms=['HS256'])
+                user_id = payload.get('user_id')
+                if not user_id:
+                    return Response({Constants.JSON_MESSAGE: "Invalid token payload"}, status=status.HTTP_401_UNAUTHORIZED)
+                
+                user_details = UserDetails.objects.filter(userId=user_id).first()
+                if not user_details:
+                    return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+                
+                requestUserId = user_details
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token has expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
             userBatchDetails = Student.objects.filter(user=requestUserId).first()
             if userBatchDetails is None:
                 return Response({Constants.JSON_MESSAGE: "Given user is Invalid or not a Student."}, status=status.HTTP_400_BAD_REQUEST)
@@ -131,8 +146,8 @@ class CurrentLevelsV2(APIView):
                             for quiz in curriculumDetails:
                                 topicCount += 1
                                 quizId = quiz.quizId
-                                progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId).first()
-                                if progress.quizPass:
+                                progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId.userId).first()
+                                if progress and progress.quizPass:
                                     numberOfTopicsPassed += 1
                         else:
                             topicCount+=len(curriculumDetails)
