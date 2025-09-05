@@ -136,22 +136,34 @@ class CurrentLevelsV2(APIView):
             latestLink = userBatch.latestLink
             latestClass = userBatchDetails.latestClassId
             levelsPercentage = {}
-            for level in range(1,latestLevel+1):
+            
+            # Get all progress records for this user in one query
+            user_progress = Progress.objects.filter(user_id=requestUserId.userId).values('quiz_id', 'quizPass')
+            progress_dict = {p['quiz_id']: p['quizPass'] for p in user_progress}
+            
+            for level in range(1, latestLevel + 1):
                 latestClassId = 12
                 topicCount = 0
                 numberOfTopicsPassed = 0
-                for currentClassId in range(1, latestClassId + 1):
-                        curriculumDetails = Curriculum.objects.filter(levelId=level, classId=currentClassId)
-                        if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
-                            for quiz in curriculumDetails:
-                                topicCount += 1
-                                quizId = quiz.quizId
-                                progress = Progress.objects.filter(quiz_id=quizId, user_id=requestUserId.userId).first()
-                                if progress and progress.quizPass:
-                                    numberOfTopicsPassed += 1
-                        else:
-                            topicCount+=len(curriculumDetails)
-                levelsPercentage.update({level: (int((numberOfTopicsPassed / topicCount) * 100))}) 
+                
+                # Get all curriculum for this level in one query
+                curriculum_details = Curriculum.objects.filter(levelId=level)
+                
+                for curriculum in curriculum_details:
+                    currentClassId = curriculum.classId
+                    if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
+                        topicCount += 1
+                        quizId = curriculum.quizId
+                        if quizId in progress_dict and progress_dict[quizId]:
+                            numberOfTopicsPassed += 1
+                    else:
+                        topicCount += 1
+                
+                if topicCount > 0:
+                    percentage = int((numberOfTopicsPassed / topicCount) * 100)
+                else:
+                    percentage = 0
+                levelsPercentage[level] = percentage 
             return Response({"levelsPercentage": levelsPercentage,
                              Constants.LEVEL_ID: latestLevel, 
                              Constants.LATEST_CLASS: latestClass,
