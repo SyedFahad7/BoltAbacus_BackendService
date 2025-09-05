@@ -110,8 +110,8 @@ class CurrentLevelsV2(APIView):
                 return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
             
             try:
-                payload = jwt.decode(auth_token, Constants.JWT_SECRET_KEY, algorithms=['HS256'])
-                user_id = payload.get('user_id')
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload.get(Constants.USER_ID)
                 if not user_id:
                     return Response({Constants.JSON_MESSAGE: "Invalid token payload"}, status=status.HTTP_401_UNAUTHORIZED)
                 
