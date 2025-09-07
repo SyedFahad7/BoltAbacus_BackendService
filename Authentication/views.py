@@ -1841,14 +1841,25 @@ class GetStudentProgressFromStudent(APIView):
 
     def post(self, request):
         try:
-            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            # Extract token from headers using .get() to avoid KeyError
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
             try:
-                userId = IdExtraction(requestUserToken)
-                if isinstance(userId, Exception):
-                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
-            except Exception as e:
-                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
-            return getStudentProgress(userId)
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            return getStudentProgress(user_id)
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1861,12 +1872,18 @@ def getStudentProgress(userId):
         if user.role != Constants.STUDENT:
             return Response({Constants.JSON_MESSAGE: "User is not a Student"}, status=status.HTTP_403_FORBIDDEN)
         student = Student.objects.filter(user_id=userId).first()
+        if student is None:
+            return Response({Constants.JSON_MESSAGE: "Student record not found"}, status=status.HTTP_404_NOT_FOUND)
         batchId = student.batch_id
         batch = Batch.objects.filter(batchId=batchId).first()
+        if batch is None:
+            return Response({Constants.JSON_MESSAGE: "Batch not found"}, status=status.HTTP_404_NOT_FOUND)
         studentProgress = Progress.objects.filter(user_id=userId)
         levelsProgress = {}
         for progress in studentProgress:
             curriculum = Curriculum.objects.filter(quizId=progress.quiz_id).first()
+            if curriculum is None:
+                continue  # Skip if curriculum not found
             levelId = curriculum.levelId
             classId = curriculum.classId
             topicId = curriculum.topicId
@@ -1902,30 +1919,65 @@ def getStudentProgress(userId):
                 for topicId in topicProgress:
                     if topicId != 0:
                         result = topicProgress[topicId]
-                        topicProgressData.append({Constants.TOPIC_ID: topicId,
-                                                  Constants.CLASSWORK: result[Constants.CLASSWORK],
-                                                  Constants.CLASSWORK_TIME: result[Constants.CLASSWORK_TIME],
-                                                  Constants.HOMEWORK: result[Constants.HOMEWORK],
-                                                  Constants.HOMEWORK_TIME: result[Constants.HOMEWORK_TIME]})
+                        topicProgressData.append({
+                            Constants.TOPIC_ID: topicId,
+                            Constants.CLASSWORK: result.get(Constants.CLASSWORK, 0),
+                            Constants.CLASSWORK_TIME: result.get(Constants.CLASSWORK_TIME, 0),
+                            Constants.HOMEWORK: result.get(Constants.HOMEWORK, 0),
+                            Constants.HOMEWORK_TIME: result.get(Constants.HOMEWORK_TIME, 0)
+                        })
                 if classId != 0:
-                    classProgressJson.update(
-                        {Constants.TEST: topicProgress[0][Constants.TEST], "Time": topicProgress[0][Constants.TEST_TIME]})
+                    # Safely get test data
+                    test_data = topicProgress.get(0, {}) if topicProgress else {}
+                    classProgressJson.update({
+                        Constants.TEST: test_data.get(Constants.TEST, 0), 
+                        "Time": test_data.get(Constants.TEST_TIME, 0)
+                    })
                     classProgressJson.update({"topics": topicProgressData})
                     classProgressData.append(classProgressJson)
             
-            levelsProgressJson.update({Constants.FINAL_TEST: classProgress[0][0].get(Constants.FINAL_TEST, 0), Constants.FINAL_TEST_TIME: classProgress[0][0].get(Constants.FINAL_TEST_TIME, 0)})
-            levelsProgressJson.update({Constants.ORAL_TEST: classProgress[0][0].get(Constants.ORAL_TEST, 0), Constants.ORAL_TEST_TIME: classProgress[0][0].get(Constants.ORAL_TEST_TIME, 0)})
+            # Safely get final test and oral test data
+            final_test_data = classProgress.get(0, {}).get(0, {}) if classProgress else {}
+            levelsProgressJson.update({
+                Constants.FINAL_TEST: final_test_data.get(Constants.FINAL_TEST, 0), 
+                Constants.FINAL_TEST_TIME: final_test_data.get(Constants.FINAL_TEST_TIME, 0)
+            })
+            levelsProgressJson.update({
+                Constants.ORAL_TEST: final_test_data.get(Constants.ORAL_TEST, 0), 
+                Constants.ORAL_TEST_TIME: final_test_data.get(Constants.ORAL_TEST_TIME, 0)
+            })
             levelsProgressJson.update({"classes": classProgressData})
             levelsProgressData.append(levelsProgressJson)
+        # Sort the data safely
         for classes in levelsProgressData:
-            classes['classes'] = sorted(classes['classes'], key=lambda x: x[Constants.CLASS_ID])
-            for topics in classes['classes']:
-                topics['topics'] = sorted(topics['topics'], key=lambda x: x[Constants.TOPIC_ID])
+            if 'classes' in classes and classes['classes']:
+                classes['classes'] = sorted(classes['classes'], key=lambda x: x.get(Constants.CLASS_ID, 0))
+                for topics in classes['classes']:
+                    if 'topics' in topics and topics['topics']:
+                        topics['topics'] = sorted(topics['topics'], key=lambda x: x.get(Constants.TOPIC_ID, 0))
 
-        return Response({Constants.FIRST_NAME: user.firstName,
-                         Constants.LAST_NAME: user.lastName,
-                         Constants.BATCH_NAME: batch.batchName,
-                         "levels": levelsProgressData}, status=status.HTTP_200_OK)
+        # Calculate practice stats
+        total_sessions = studentProgress.count()
+        total_correct = sum(progress.correctAnswers for progress in studentProgress)
+        total_questions = sum(progress.totalQuestions for progress in studentProgress)
+        total_time = sum(progress.timeSpent for progress in studentProgress)
+        
+        practice_stats = {
+            "totalSessions": total_sessions,
+            "totalCorrectAnswers": total_correct,
+            "totalQuestions": total_questions,
+            "totalTimeSpent": total_time,
+            "averageAccuracy": (total_correct / total_questions * 100) if total_questions > 0 else 0,
+            "averageTimePerSession": (total_time / total_sessions) if total_sessions > 0 else 0
+        }
+        
+        return Response({
+            Constants.FIRST_NAME: user.firstName,
+            Constants.LAST_NAME: user.lastName,
+            Constants.BATCH_NAME: batch.batchName,
+            "levels": levelsProgressData,
+            "practiceStats": practice_stats
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
