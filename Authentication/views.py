@@ -151,12 +151,12 @@ class CurrentLevelsV2(APIView):
                 
                 for curriculum in curriculum_details:
                     currentClassId = curriculum.classId
-                    if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
-                        topicCount += 1
+                        if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
+                                topicCount += 1
                         quizId = curriculum.quizId
                         if quizId in progress_dict and progress_dict[quizId]:
-                            numberOfTopicsPassed += 1
-                    else:
+                                    numberOfTopicsPassed += 1
+                        else:
                         topicCount += 1
                 
                 if topicCount > 0:
@@ -2975,6 +2975,225 @@ class GetUserExperience(APIView):
             return Response({
                 'success': True,
                 'data': exp_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetWeeklyStats(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Calculate weekly stats (last 7 days)
+            from datetime import datetime, timedelta
+            week_ago = datetime.now() - timedelta(days=7)
+            
+            # Get practice sessions from last week
+            weekly_sessions = Progress.objects.filter(
+                user=user,
+                created_at__gte=week_ago
+            ).count()
+            
+            # Calculate accuracy (correct answers / total attempts)
+            total_attempts = Progress.objects.filter(
+                user=user,
+                created_at__gte=week_ago
+            ).aggregate(total=models.Sum('totalQuestions'))['total'] or 0
+            
+            total_correct = Progress.objects.filter(
+                user=user,
+                created_at__gte=week_ago
+            ).aggregate(total=models.Sum('correctAnswers'))['total'] or 0
+            
+            accuracy = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            
+            # Calculate time spent (in seconds)
+            time_spent = Progress.objects.filter(
+                user=user,
+                created_at__gte=week_ago
+            ).aggregate(total=models.Sum('timeSpent'))['total'] or 0
+            
+            # Convert to hours and minutes
+            hours = int(time_spent // 3600)
+            minutes = int((time_spent % 3600) // 60)
+            
+            stats_data = {
+                'sessions': weekly_sessions,
+                'accuracy': round(accuracy, 1),
+                'time_spent_hours': hours,
+                'time_spent_minutes': minutes,
+                'time_spent_formatted': f"{hours}h {minutes}m"
+            }
+            
+            return Response({
+                'success': True,
+                'data': stats_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetUserTodoList(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Generate personalized todo list based on user progress
+            todos = []
+            
+            # Check if user has completed any practice sessions
+            practice_sessions = Progress.objects.filter(user=user).count()
+            if practice_sessions == 0:
+                todos.append({
+                    'id': 'first_practice',
+                    'title': 'Complete your first practice session',
+                    'description': 'Start your learning journey with a practice session',
+                    'completed': False,
+                    'priority': 'high',
+                    'type': 'practice'
+                })
+            elif practice_sessions < 5:
+                todos.append({
+                    'id': 'complete_5_sessions',
+                    'title': f'Complete {5 - practice_sessions} more practice sessions',
+                    'description': 'Build consistency with regular practice',
+                    'completed': False,
+                    'priority': 'medium',
+                    'type': 'practice'
+                })
+            
+            # Check streak
+            try:
+                user_streak, _ = UserStreak.get_or_create_streak(user)
+                if user_streak.current_streak == 0:
+                    todos.append({
+                        'id': 'start_streak',
+                        'title': 'Start your learning streak',
+                        'description': 'Practice daily to build a streak',
+                        'completed': False,
+                        'priority': 'high',
+                        'type': 'streak'
+                    })
+                elif user_streak.current_streak < 7:
+                    todos.append({
+                        'id': 'week_streak',
+                        'title': f'Maintain streak for {7 - user_streak.current_streak} more days',
+                        'description': 'Reach a 7-day streak milestone',
+                        'completed': False,
+                        'priority': 'medium',
+                        'type': 'streak'
+                    })
+            except:
+                pass
+            
+            # Check experience level
+            try:
+                user_exp, _ = UserExperience.objects.get_or_create(
+                    user=user,
+                    defaults={'experience_points': 0, 'level': 1}
+                )
+                if user_exp.level < 5:
+                    todos.append({
+                        'id': 'reach_level_5',
+                        'title': f'Reach Level 5 (Current: Level {user_exp.level})',
+                        'description': 'Gain more experience points to level up',
+                        'completed': False,
+                        'priority': 'medium',
+                        'type': 'level'
+                    })
+            except:
+                pass
+            
+            # Check if user has tried PVP
+            pvp_games = PVPGameResult.objects.filter(
+                models.Q(player1=user) | models.Q(player2=user)
+            ).count()
+            if pvp_games == 0:
+                todos.append({
+                    'id': 'try_pvp',
+                    'title': 'Try PVP mode',
+                    'description': 'Challenge other players in multiplayer battles',
+                    'completed': False,
+                    'priority': 'low',
+                    'type': 'pvp'
+                })
+            
+            # Add some completed todos for motivation
+            if practice_sessions > 0:
+                todos.append({
+                    'id': 'first_practice_completed',
+                    'title': 'Complete your first practice session',
+                    'description': 'Great start to your learning journey!',
+                    'completed': True,
+                    'priority': 'high',
+                    'type': 'practice'
+                })
+            
+            if practice_sessions >= 5:
+                todos.append({
+                    'id': 'complete_5_sessions_completed',
+                    'title': 'Complete 5 practice sessions',
+                    'description': 'Excellent consistency!',
+                    'completed': True,
+                    'priority': 'medium',
+                    'type': 'practice'
+                })
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'todos': todos,
+                    'total_todos': len(todos),
+                    'completed_todos': len([t for t in todos if t['completed']]),
+                    'pending_todos': len([t for t in todos if not t['completed']])
+                }
             }, status=status.HTTP_200_OK)
             
         except Exception as e:

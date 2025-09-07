@@ -80,5 +80,11 @@ urlpatterns = [
     path('streak/', views.GetUserStreak.as_view()),
     path('streak/update/', views.UpdateUserStreak.as_view()),
     path('streak/reset/', views.ResetUserStreak.as_view()),
+    
+    # Weekly Stats API
+    path('weeklyStats/', views.GetWeeklyStats.as_view()),
+    
+    # Todo List API
+    path('getUserTodoList/', views.GetUserTodoList.as_view()),
 
 ]
