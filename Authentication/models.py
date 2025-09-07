@@ -116,6 +116,34 @@ class UserExperience(models.Model):
         return f"{self.user.firstName} {self.user.lastName} - Level {self.level} ({self.experience_points} XP)"
 
 
+class PersonalGoal(models.Model):
+    PRIORITY_CHOICES = [
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+    ]
+    
+    TYPE_CHOICES = [
+        ('personal', 'Personal'),
+        ('practice', 'Practice'),
+        ('streak', 'Streak'),
+        ('level', 'Level'),
+        ('pvp', 'PVP'),
+    ]
+    
+    user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE, related_name='personal_goals')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    completed = models.BooleanField(default=False)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    goal_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='personal')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.firstName} {self.user.lastName} - {self.title}"
+
+
 class PVPRoom(models.Model):
     ROOM_STATUS_CHOICES = [
         ('waiting', 'Waiting for Players'),

@@ -86,5 +86,7 @@ urlpatterns = [
     
     # Todo List API
     path('getUserTodoList/', views.GetUserTodoList.as_view()),
+    path('addPersonalGoal/', views.AddPersonalGoal.as_view()),
+    path('removePersonalGoal/', views.RemovePersonalGoal.as_view()),
 
 ]

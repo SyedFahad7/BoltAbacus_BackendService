@@ -3186,6 +3186,19 @@ class GetUserTodoList(APIView):
                     'type': 'practice'
                 })
             
+            # Add personal goals from database
+            from .models import PersonalGoal
+            personal_goals = PersonalGoal.objects.filter(user=user).order_by('-created_at')
+            for goal in personal_goals:
+                todos.append({
+                    'id': str(goal.id),
+                    'title': goal.title,
+                    'description': goal.description or '',
+                    'completed': goal.completed,
+                    'priority': goal.priority,
+                    'type': goal.goal_type
+                })
+            
             return Response({
                 'success': True,
                 'data': {
@@ -3195,6 +3208,122 @@ class GetUserTodoList(APIView):
                     'pending_todos': len([t for t in todos if not t['completed']])
                 }
             }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddPersonalGoal(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get goal data from request
+            goal_title = request.data.get('title', '').strip()
+            goal_description = request.data.get('description', '').strip()
+            
+            if not goal_title:
+                return Response({Constants.JSON_MESSAGE: "Goal title is required"}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create personal goal using PersonalGoal model
+            from .models import PersonalGoal
+            
+            personal_goal = PersonalGoal.objects.create(
+                user=user,
+                title=goal_title,
+                description=goal_description,
+                priority='medium',
+                goal_type='personal'
+            )
+            
+            return Response({
+                'success': True,
+                'message': 'Personal goal added successfully',
+                'data': {
+                    'id': str(personal_goal.id),
+                    'title': personal_goal.title,
+                    'description': personal_goal.description,
+                    'completed': personal_goal.completed,
+                    'priority': personal_goal.priority,
+                    'type': personal_goal.goal_type
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RemovePersonalGoal(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get goal ID from request
+            goal_id = request.data.get('goal_id', '').strip()
+            
+            if not goal_id:
+                return Response({Constants.JSON_MESSAGE: "Goal ID is required"}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Remove personal goal using PersonalGoal model
+            from .models import PersonalGoal
+            
+            try:
+                personal_goal = PersonalGoal.objects.get(id=goal_id, user=user)
+                personal_goal.delete()
+                
+                return Response({
+                    'success': True,
+                    'message': 'Personal goal removed successfully'
+                }, status=status.HTTP_200_OK)
+            except PersonalGoal.DoesNotExist:
+                return Response({Constants.JSON_MESSAGE: "Personal goal not found"}, 
+                              status=status.HTTP_404_NOT_FOUND)
             
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
