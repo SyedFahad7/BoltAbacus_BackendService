@@ -151,12 +151,12 @@ class CurrentLevelsV2(APIView):
                 
                 for curriculum in curriculum_details:
                     currentClassId = curriculum.classId
-                        if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
-                                topicCount += 1
-                        quizId = curriculum.quizId
-                        if quizId in progress_dict and progress_dict[quizId]:
-                                    numberOfTopicsPassed += 1
-                        else:
+                    if latestLevel > level or (latestClass >= currentClassId and level == latestLevel):
+                        topicCount += 1
+                    quizId = curriculum.quizId
+                    if quizId in progress_dict and progress_dict[quizId]:
+                        numberOfTopicsPassed += 1
+                    else:
                         topicCount += 1
                 
                 if topicCount > 0:
