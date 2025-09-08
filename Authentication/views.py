@@ -4073,6 +4073,8 @@ class GetPVPLeaderboard(APIView):
 # Streak Management APIs
 class GetUserStreak(APIView):
     """Get user's current streak information"""
+    authentication_classes = []  # Disable DRF authentication
+    permission_classes = [AllowAny]
     
     def get(self, request):
         return self._handle_request(request)
@@ -4136,6 +4138,8 @@ class GetUserStreak(APIView):
 
 class UpdateUserStreak(APIView):
     """Update user's streak (increment for daily activity)"""
+    authentication_classes = []  # Disable DRF authentication
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
@@ -4194,6 +4198,8 @@ class UpdateUserStreak(APIView):
 
 class ResetUserStreak(APIView):
     """Reset user's streak to 0"""
+    authentication_classes = []  # Disable DRF authentication
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
@@ -4250,6 +4256,7 @@ class ResetUserStreak(APIView):
 
 
 class GetAccuracyTrend(APIView):
+    authentication_classes = []  # Disable DRF authentication
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -4333,6 +4340,7 @@ class GetAccuracyTrend(APIView):
 
 
 class GetSpeedTrend(APIView):
+    authentication_classes = []  # Disable DRF authentication
     permission_classes = [AllowAny]
 
     def post(self, request):
