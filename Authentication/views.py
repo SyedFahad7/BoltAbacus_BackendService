@@ -1969,10 +1969,10 @@ def getStudentProgress(userId):
                         topics['topics'] = sorted(topics['topics'], key=lambda x: x.get(Constants.TOPIC_ID, 0))
 
         # Calculate practice stats
-        total_sessions = studentProgress.count()
-        total_correct = sum(progress.correctAnswers for progress in studentProgress)
-        total_questions = sum(progress.totalQuestions for progress in studentProgress)
-        total_time = sum(progress.timeSpent for progress in studentProgress)
+        total_sessions = len(studentProgress)
+        total_correct = sum(getattr(progress, 'correctAnswers', 0) for progress in studentProgress)
+        total_questions = sum(getattr(progress, 'totalQuestions', 0) for progress in studentProgress)
+        total_time = sum(getattr(progress, 'timeSpent', 0) for progress in studentProgress)
         
         practice_stats = {
             "totalSessions": total_sessions,
