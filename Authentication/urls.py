@@ -88,5 +88,9 @@ urlpatterns = [
     path('getUserTodoList/', views.GetUserTodoList.as_view()),
     path('addPersonalGoal/', views.AddPersonalGoal.as_view()),
     path('removePersonalGoal/', views.RemovePersonalGoal.as_view()),
+    
+    # Trend APIs
+    path('accuracyTrend/', views.GetAccuracyTrend.as_view()),
+    path('speedTrend/', views.GetSpeedTrend.as_view()),
 
 ]

@@ -4235,3 +4235,165 @@ class ResetUserStreak(APIView):
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: f"Error resetting streak: {str(e)}"}, 
                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetAccuracyTrend(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user's progress data for the last 7 days
+            from datetime import datetime, timedelta
+            seven_days_ago = datetime.now() - timedelta(days=7)
+            
+            # Get progress records from the last 7 days
+            recent_progress = Progress.objects.filter(
+                user_id=user_id,
+                created_at__gte=seven_days_ago
+            ).order_by('created_at')
+            
+            # Calculate daily accuracy
+            daily_accuracy = []
+            current_date = seven_days_ago.date()
+            today = datetime.now().date()
+            
+            while current_date <= today:
+                day_progress = recent_progress.filter(created_at__date=current_date)
+                
+                if day_progress.exists():
+                    total_correct = sum(p.correctAnswers for p in day_progress if hasattr(p, 'correctAnswers'))
+                    total_questions = sum(p.totalQuestions for p in day_progress if hasattr(p, 'totalQuestions'))
+                    
+                    if total_questions > 0:
+                        accuracy = (total_correct / total_questions) * 100
+                    else:
+                        accuracy = 0
+                else:
+                    accuracy = 0
+                
+                daily_accuracy.append(round(accuracy, 1))
+                current_date += timedelta(days=1)
+            
+            # Calculate current accuracy (last non-zero day)
+            current_accuracy = 0
+            for acc in reversed(daily_accuracy):
+                if acc > 0:
+                    current_accuracy = acc
+                    break
+            
+            # Calculate weekly progress
+            weekly_progress = 0
+            if len(daily_accuracy) >= 2:
+                first_day = daily_accuracy[0]
+                last_day = daily_accuracy[-1]
+                weekly_progress = round(last_day - first_day, 1)
+            
+            return Response({
+                'currentAccuracy': current_accuracy,
+                'weeklyProgress': weekly_progress,
+                'dailyAccuracy': daily_accuracy,
+                'labels': [f"{i}d ago" if i > 0 else "Today" for i in range(len(daily_accuracy))]
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting accuracy trend: {str(e)}"}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetSpeedTrend(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user's progress data for the last 7 days
+            from datetime import datetime, timedelta
+            seven_days_ago = datetime.now() - timedelta(days=7)
+            
+            # Get progress records from the last 7 days
+            recent_progress = Progress.objects.filter(
+                user_id=user_id,
+                created_at__gte=seven_days_ago
+            ).order_by('created_at')
+            
+            # Calculate daily speed (problems per minute)
+            daily_speed = []
+            current_date = seven_days_ago.date()
+            today = datetime.now().date()
+            
+            while current_date <= today:
+                day_progress = recent_progress.filter(created_at__date=current_date)
+                
+                if day_progress.exists():
+                    total_questions = sum(p.totalQuestions for p in day_progress if hasattr(p, 'totalQuestions'))
+                    total_time_minutes = sum(p.timeSpent for p in day_progress if hasattr(p, 'timeSpent')) / 60
+                    
+                    if total_time_minutes > 0:
+                        speed = total_questions / total_time_minutes
+                    else:
+                        speed = 0
+                else:
+                    speed = 0
+                
+                daily_speed.append(round(speed, 1))
+                current_date += timedelta(days=1)
+            
+            # Calculate current speed (last non-zero day)
+            current_speed = 0
+            for speed in reversed(daily_speed):
+                if speed > 0:
+                    current_speed = speed
+                    break
+            
+            # Calculate weekly progress
+            weekly_progress = 0
+            if len(daily_speed) >= 2:
+                first_day = daily_speed[0]
+                last_day = daily_speed[-1]
+                weekly_progress = round(last_day - first_day, 1)
+            
+            return Response({
+                'currentSpeed': current_speed,
+                'weeklyProgress': weekly_progress,
+                'dailySpeed': daily_speed,
+                'labels': [f"{i}d ago" if i > 0 else "Today" for i in range(len(daily_speed))]
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting speed trend: {str(e)}"}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
