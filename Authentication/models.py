@@ -213,6 +213,7 @@ class PVPGameSession(models.Model):
     current_question = models.ForeignKey(QuizQuestions, on_delete=models.SET_NULL, null=True, blank=True)
     question_start_time = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=False)
+    questions_data = models.JSONField(default=list, blank=True)  # Store generated questions
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

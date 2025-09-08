@@ -528,29 +528,54 @@ def ConvertToString(questionJson):
 
         return question
 
+def generateOptions(correct_answer):
+    """Generate 4 options with the correct answer and 3 wrong answers"""
+    import random
+    
+    options = [correct_answer]
+    
+    # Generate 3 wrong options
+    for _ in range(3):
+        # Create wrong answers that are close to the correct answer
+        if correct_answer > 10:
+            wrong_answer = correct_answer + random.randint(-correct_answer//2, correct_answer//2)
+        else:
+            wrong_answer = correct_answer + random.randint(-5, 5)
+        
+        # Ensure wrong answer is positive and different from correct answer
+        while wrong_answer <= 0 or wrong_answer in options:
+            if correct_answer > 10:
+                wrong_answer = correct_answer + random.randint(-correct_answer//2, correct_answer//2)
+            else:
+                wrong_answer = correct_answer + random.randint(-5, 5)
+        
+        options.append(wrong_answer)
+    
+    # Shuffle the options
+    random.shuffle(options)
+    return options
+
 def generatePVPQuestion(difficulty_level='medium'):
     """
     Generate a math question based on difficulty level for PVP games.
     
     Difficulty levels:
-    - Easy: 2-3 operands, basic operations (+, -, ×, ÷)
-    - Medium: 3-4 operands, includes squares (²)
-    - Hard: 4-5 operands, includes cubes (³), square roots (√)
-    - Expert: 5-6+ operands, includes cube roots (∛), complex combinations
+    - Easy: 6-10 operands, basic operations (+, -) only
+    - Medium: 6-10 operands, includes multiplication and division
+    - Hard: 10+ operands, all operations including squares and square roots
+    - Expert: 10+ operands, includes cube roots, complex combinations
     """
     import random
+    import math
     
     if difficulty_level == 'easy':
-        # Easy: 2-3 operands, basic operations
-        num_operands = random.randint(2, 3)
-        operations = ['+', '-', '*', '/']
+        # Easy: 6-10 operands, only addition and subtraction
+        num_operands = random.randint(6, 10)
+        operations = ['+', '-']
         
         numbers = []
         for i in range(num_operands):
-            if i == 0:
-                numbers.append(random.randint(1, 50))
-            else:
-                numbers.append(random.randint(1, 20))
+            numbers.append(random.randint(1, 20))
         
         # Generate question string
         question_str = str(numbers[0])
@@ -569,46 +594,33 @@ def generatePVPQuestion(difficulty_level='medium'):
                     num = answer // 2
                 answer -= num
                 question_str += f" - {num}"
-            elif op == '*':
-                answer *= num
-                question_str += f" × {num}"
-            elif op == '/':
-                # Ensure division results in whole number
-                if answer % num != 0:
-                    # Find a divisor that works
-                    divisors = []
-                    for d in range(1, min(answer, 20) + 1):
-                        if answer % d == 0:
-                            divisors.append(d)
-                    if divisors:
-                        num = random.choice(divisors)
-                    else:
-                        num = 1
-                answer //= num
-                question_str += f" ÷ {num}"
         
         # Ensure answer is positive
         if answer <= 0:
             answer = abs(answer) + 1
         
+        # Generate 4 options with correct answer
+        options = generateOptions(answer)
+        
         return {
             'question': f"{question_str} = ?",
             'answer': answer,
+            'options': options,
             'numbers': numbers,
             'operations': operations[:num_operands-1]
         }
     
     elif difficulty_level == 'medium':
-        # Medium: 3-4 operands, includes squares
-        num_operands = random.randint(3, 4)
-        operations = ['+', '-', '*', '/', '²']
+        # Medium: 6-10 operands, includes multiplication and division
+        num_operands = random.randint(6, 10)
+        operations = ['+', '-', '*', '/']
         
         numbers = []
         for i in range(num_operands):
             if i == 0:
-                numbers.append(random.randint(1, 30))
+                numbers.append(random.randint(1, 20))
             else:
-                numbers.append(random.randint(1, 15))
+                numbers.append(random.randint(1, 10))
         
         question_str = str(numbers[0])
         answer = numbers[0]
@@ -617,11 +629,7 @@ def generatePVPQuestion(difficulty_level='medium'):
             op = random.choice(operations)
             num = numbers[i]
             
-            if op == '²':
-                # Square the current answer
-                answer = answer ** 2
-                question_str += "²"
-            elif op == '+':
+            if op == '+':
                 answer += num
                 question_str += f" + {num}"
             elif op == '-':
@@ -635,7 +643,7 @@ def generatePVPQuestion(difficulty_level='medium'):
             elif op == '/':
                 if answer % num != 0:
                     divisors = []
-                    for d in range(1, min(answer, 15) + 1):
+                    for d in range(1, min(answer, 10) + 1):
                         if answer % d == 0:
                             divisors.append(d)
                     if divisors:
@@ -648,24 +656,27 @@ def generatePVPQuestion(difficulty_level='medium'):
         if answer <= 0:
             answer = abs(answer) + 1
         
+        options = generateOptions(answer)
+        
         return {
             'question': f"{question_str} = ?",
             'answer': answer,
+            'options': options,
             'numbers': numbers,
             'operations': operations[:num_operands-1]
         }
     
     elif difficulty_level == 'hard':
-        # Hard: 4-5 operands, includes cubes and square roots
-        num_operands = random.randint(4, 5)
-        operations = ['+', '-', '*', '/', '²', '³', '√']
+        # Hard: 10+ operands, includes squares and square roots
+        num_operands = random.randint(10, 15)
+        operations = ['+', '-', '*', '/', '²', '√']
         
         numbers = []
         for i in range(num_operands):
             if i == 0:
-                numbers.append(random.randint(1, 25))
+                numbers.append(random.randint(1, 15))
             else:
-                numbers.append(random.randint(1, 12))
+                numbers.append(random.randint(1, 8))
         
         question_str = str(numbers[0])
         answer = numbers[0]
@@ -677,9 +688,6 @@ def generatePVPQuestion(difficulty_level='medium'):
             if op == '²':
                 answer = answer ** 2
                 question_str += "²"
-            elif op == '³':
-                answer = answer ** 3
-                question_str += "³"
             elif op == '√':
                 # Ensure square root results in whole number
                 perfect_square = int(answer ** 0.5) ** 2
@@ -704,7 +712,7 @@ def generatePVPQuestion(difficulty_level='medium'):
             elif op == '/':
                 if answer % num != 0:
                     divisors = []
-                    for d in range(1, min(answer, 12) + 1):
+                    for d in range(1, min(answer, 8) + 1):
                         if answer % d == 0:
                             divisors.append(d)
                     if divisors:
@@ -717,16 +725,19 @@ def generatePVPQuestion(difficulty_level='medium'):
         if answer <= 0:
             answer = abs(answer) + 1
         
+        options = generateOptions(answer)
+        
         return {
             'question': f"{question_str} = ?",
             'answer': answer,
+            'options': options,
             'numbers': numbers,
             'operations': operations[:num_operands-1]
         }
     
     else:  # expert
-        # Expert: 5-6+ operands, complex combinations including cube roots
-        num_operands = random.randint(5, 6)
+        # Expert: 10+ operands, includes cube roots and complex combinations
+        num_operands = random.randint(10, 20)
         operations = ['+', '-', '*', '/', '²', '³', '√', '∛']
         
         numbers = []
@@ -792,9 +803,12 @@ def generatePVPQuestion(difficulty_level='medium'):
         if answer <= 0:
             answer = abs(answer) + 1
         
+        options = generateOptions(answer)
+        
         return {
             'question': f"{question_str} = ?",
             'answer': answer,
+            'options': options,
             'numbers': numbers,
             'operations': operations[:num_operands-1]
         }
@@ -3729,16 +3743,34 @@ class StartPVPGame(APIView):
             if room.creator != user:
                 return Response({Constants.JSON_MESSAGE: "Only the room creator can start the game"}, status=status.HTTP_403_FORBIDDEN)
             
-            # Check if there are at least 2 players
+            # Check if room is already active
+            if room.status == 'active':
+                return Response({Constants.JSON_MESSAGE: "Game is already active"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check player count based on room type
             players = room.players.all()
             if not players.exists():
                 return Response({Constants.JSON_MESSAGE: "No players in room"}, status=status.HTTP_400_BAD_REQUEST)
             
-            if players.count() < 2:
-                return Response({Constants.JSON_MESSAGE: "Need at least 2 players to start the game"}, status=status.HTTP_400_BAD_REQUEST)
+            current_player_count = players.count()
+            max_players = room.max_players
+            
+            # Check if we have enough players for the room type
+            if current_player_count < max_players:
+                return Response({
+                    Constants.JSON_MESSAGE: f"Need {max_players} players to start the game. Currently have {current_player_count} players."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if all players are ready
+            ready_players = players.filter(is_ready=True).count()
+            if ready_players < current_player_count:
+                return Response({
+                    Constants.JSON_MESSAGE: f"All players must be ready to start. {current_player_count - ready_players} players are not ready."
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Update room status to active
             room.status = 'active'
+            room.started_at = timezone.now()
             room.save()
             
             # Create game session
@@ -3748,12 +3780,30 @@ class StartPVPGame(APIView):
                 is_active=True
             )
             
+            # Generate questions for the game
+            questions = []
+            for i in range(room.number_of_questions):
+                question_data = generatePVPQuestion(room.difficulty_level)
+                questions.append({
+                    'question_id': i + 1,
+                    'question': question_data['question'],
+                    'correct_answer': question_data['answer'],
+                    'options': question_data['options']
+                })
+            
+            # Store questions in game session (you might want to create a separate model for this)
+            game_session.questions_data = questions
+            game_session.save()
+            
             return Response({
                 'success': True,
                 'data': {
                     'message': 'Game started successfully',
                     'game_session_id': game_session.id,
-                    'room_status': room.status
+                    'room_status': room.status,
+                    'questions': questions,
+                    'total_questions': room.number_of_questions,
+                    'time_per_question': room.time_per_question
                 }
             }, status=status.HTTP_200_OK)
             
