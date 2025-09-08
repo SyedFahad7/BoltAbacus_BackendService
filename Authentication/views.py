@@ -1970,9 +1970,9 @@ def getStudentProgress(userId):
 
         # Calculate practice stats
         total_sessions = len(studentProgress)
-        total_correct = sum(getattr(progress, 'correctAnswers', 0) for progress in studentProgress)
-        total_questions = sum(getattr(progress, 'totalQuestions', 0) for progress in studentProgress)
-        total_time = sum(getattr(progress, 'timeSpent', 0) for progress in studentProgress)
+        total_correct = sum(progress.score for progress in studentProgress)  # score represents problems solved
+        total_questions = sum(progress.score for progress in studentProgress)  # same as total_correct for now
+        total_time = sum(progress.time for progress in studentProgress)  # time in seconds
         
         practice_stats = {
             "totalSessions": total_sessions,
@@ -4075,6 +4075,12 @@ class GetUserStreak(APIView):
     """Get user's current streak information"""
     
     def get(self, request):
+        return self._handle_request(request)
+    
+    def post(self, request):
+        return self._handle_request(request)
+    
+    def _handle_request(self, request):
         try:
             # Extract token from headers
             auth_token = request.headers.get(Constants.TOKEN_HEADER)
@@ -4279,13 +4285,10 @@ class GetAccuracyTrend(APIView):
                 day_progress = recent_progress.filter(created_at__date=current_date)
                 
                 if day_progress.exists():
-                    total_correct = sum(p.correctAnswers for p in day_progress if hasattr(p, 'correctAnswers'))
-                    total_questions = sum(p.totalQuestions for p in day_progress if hasattr(p, 'totalQuestions'))
-                    
-                    if total_questions > 0:
-                        accuracy = (total_correct / total_questions) * 100
-                    else:
-                        accuracy = 0
+                    # Use percentage field from Progress model
+                    total_percentage = sum(p.percentage for p in day_progress)
+                    count = day_progress.count()
+                    accuracy = total_percentage / count if count > 0 else 0
                 else:
                     accuracy = 0
                 
@@ -4360,11 +4363,12 @@ class GetSpeedTrend(APIView):
                 day_progress = recent_progress.filter(created_at__date=current_date)
                 
                 if day_progress.exists():
-                    total_questions = sum(p.totalQuestions for p in day_progress if hasattr(p, 'totalQuestions'))
-                    total_time_minutes = sum(p.timeSpent for p in day_progress if hasattr(p, 'timeSpent')) / 60
+                    # Use score as number of problems solved and time field from Progress model
+                    total_problems = sum(p.score for p in day_progress)  # score represents problems solved
+                    total_time_minutes = sum(p.time for p in day_progress) / 60  # time is in seconds
                     
                     if total_time_minutes > 0:
-                        speed = total_questions / total_time_minutes
+                        speed = total_problems / total_time_minutes
                     else:
                         speed = 0
                 else:
