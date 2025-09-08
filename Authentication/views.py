@@ -4082,10 +4082,16 @@ class GetUserStreak(APIView):
     
     def _handle_request(self, request):
         try:
+            # Debug logging
+            print(f"[DEBUG] Streak request headers: {dict(request.headers)}")
+            print(f"[DEBUG] Looking for header: {Constants.TOKEN_HEADER}")
+            
             # Extract token from headers
             auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            print(f"[DEBUG] Auth token found: {auth_token is not None}")
             
             if not auth_token:
+                print("[DEBUG] No auth token found, returning 401")
                 return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
@@ -4248,10 +4254,15 @@ class GetAccuracyTrend(APIView):
 
     def post(self, request):
         try:
+            # Debug logging
+            print(f"[DEBUG] Accuracy trend request headers: {dict(request.headers)}")
+            
             # Extract token from headers
             auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            print(f"[DEBUG] Auth token found: {auth_token is not None}")
             
             if not auth_token:
+                print("[DEBUG] No auth token found, returning 401")
                 return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
