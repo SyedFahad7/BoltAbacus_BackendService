@@ -1841,6 +1841,8 @@ class GetStudentProgressFromStudent(APIView):
 
     def post(self, request):
         try:
+            import time
+            start_time = time.time()
             # Extract token from headers using .get() to avoid KeyError
             auth_token = request.headers.get(Constants.TOKEN_HEADER)
             
@@ -1859,29 +1861,39 @@ class GetStudentProgressFromStudent(APIView):
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
-            return getStudentProgress(user_id)
+            resp = getStudentProgress(user_id)
+            try:
+                took_ms = int((time.time() - start_time) * 1000)
+                print(f"[PERF] getStudentProgress user={user_id} took={took_ms}ms")
+            except Exception:
+                pass
+            return resp
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def getStudentProgress(userId):
     try:
+        # Optimize queries by using get() where appropriate and prefetching related data
         user = UserDetails.objects.filter(userId=userId).first()
         if user is None:
             return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
         if user.role != Constants.STUDENT:
             return Response({Constants.JSON_MESSAGE: "User is not a Student"}, status=status.HTTP_403_FORBIDDEN)
-        student = Student.objects.filter(user_id=userId).first()
+        student = Student.objects.select_related('batch').filter(user_id=userId).first()
         if student is None:
             return Response({Constants.JSON_MESSAGE: "Student record not found"}, status=status.HTTP_404_NOT_FOUND)
         batchId = student.batch_id
-        batch = Batch.objects.filter(batchId=batchId).first()
+        batch = getattr(student, 'batch', None) or Batch.objects.filter(batchId=batchId).first()
         if batch is None:
             return Response({Constants.JSON_MESSAGE: "Batch not found"}, status=status.HTTP_404_NOT_FOUND)
-        studentProgress = Progress.objects.filter(user_id=userId)
+        # Prefetch curriculum for all quizIds to avoid N+1
+        studentProgress = list(Progress.objects.filter(user_id=userId).only('quiz_id', 'percentage', 'time'))
+        quiz_ids = [p.quiz_id for p in studentProgress if p.quiz_id is not None]
+        curricula = {c.quizId: c for c in Curriculum.objects.filter(quizId__in=quiz_ids).only('quizId', 'levelId', 'classId', 'topicId')}
         levelsProgress = {}
         for progress in studentProgress:
-            curriculum = Curriculum.objects.filter(quizId=progress.quiz_id).first()
+            curriculum = curricula.get(progress.quiz_id)
             if curriculum is None:
                 continue  # Skip if curriculum not found
             levelId = curriculum.levelId
