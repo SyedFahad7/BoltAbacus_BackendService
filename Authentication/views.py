@@ -3526,6 +3526,10 @@ class CreatePVPRoom(APIView):
                 total_time=0
             )
             
+            # Update current players count
+            room.current_players = 1
+            room.save()
+            
             return Response({
                 'success': True,
                 'data': {
@@ -3588,6 +3592,10 @@ class JoinPVPRoom(APIView):
                 correct_answers=0,
                 total_time=0
             )
+            
+            # Update current players count
+            room.current_players = room.players.count()
+            room.save()
             
             return Response({
                 'success': True,
@@ -3652,6 +3660,7 @@ class GetPVPRoomDetails(APIView):
                 'current_players': room.players.count(),
                 'number_of_questions': room.number_of_questions,
                 'time_per_question': room.time_per_question,
+                'difficulty_level': room.difficulty_level,
                 'status': room.status,
                 'players': players_data,
                 'created_at': room.created_at
