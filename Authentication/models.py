@@ -370,3 +370,134 @@ class UserAchievement(models.Model):
 
     def __str__(self):
         return f"{self.user.firstName} - {self.get_achievement_type_display()}"
+
+
+# Daily Progress Tracking Model
+class DailyProgress(models.Model):
+    user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE, related_name='daily_progress')
+    date = models.DateField(db_index=True)
+    
+    # Daily aggregated metrics
+    total_accuracy = models.FloatField(default=0.0)  # Average accuracy for the day
+    total_speed = models.FloatField(default=0.0)     # Average problems per minute
+    total_activities = models.IntegerField(default=0)  # Number of activities completed
+    total_time_spent = models.IntegerField(default=0)  # Total time in seconds
+    
+    # Activity breakdown
+    classwork_completed = models.IntegerField(default=0)
+    homework_completed = models.IntegerField(default=0)
+    tests_completed = models.IntegerField(default=0)
+    practice_sessions = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'date']
+        db_table = 'Authentication_dailyprogress'
+        indexes = [
+            models.Index(fields=['user', 'date']),
+            models.Index(fields=['date']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.firstName} - {self.date}: {self.total_accuracy}% accuracy, {self.total_speed} problems/min"
+
+    @classmethod
+    def update_daily_progress(cls, user, accuracy, speed, time_spent, activity_type='classwork'):
+        """Update or create daily progress record"""
+        today = date.today()
+        
+        # Get or create today's record
+        daily_progress, created = cls.objects.get_or_create(
+            user=user,
+            date=today,
+            defaults={
+                'total_accuracy': accuracy,
+                'total_speed': speed,
+                'total_activities': 1,
+                'total_time_spent': time_spent,
+                'classwork_completed': 1 if activity_type == 'classwork' else 0,
+                'homework_completed': 1 if activity_type == 'homework' else 0,
+                'tests_completed': 1 if activity_type == 'test' else 0,
+                'practice_sessions': 1 if activity_type == 'practice' else 0,
+            }
+        )
+        
+        if not created:
+            # Update existing record with weighted averages
+            old_activities = daily_progress.total_activities
+            new_activities = old_activities + 1
+            
+            # Calculate weighted averages
+            daily_progress.total_accuracy = (
+                (daily_progress.total_accuracy * old_activities + accuracy) / new_activities
+            )
+            daily_progress.total_speed = (
+                (daily_progress.total_speed * old_activities + speed) / new_activities
+            )
+            
+            # Update counters
+            daily_progress.total_activities = new_activities
+            daily_progress.total_time_spent += time_spent
+            
+            # Update activity type counters
+            if activity_type == 'classwork':
+                daily_progress.classwork_completed += 1
+            elif activity_type == 'homework':
+                daily_progress.homework_completed += 1
+            elif activity_type == 'test':
+                daily_progress.tests_completed += 1
+            elif activity_type == 'practice':
+                daily_progress.practice_sessions += 1
+            
+            daily_progress.save()
+        
+        return daily_progress
+
+    @classmethod
+    def get_weekly_trend(cls, user, days=7):
+        """Get weekly trend data for charts"""
+        from datetime import timedelta
+        
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days-1)
+        
+        # Get all records for the week
+        weekly_data = cls.objects.filter(
+            user=user,
+            date__range=[start_date, end_date]
+        ).order_by('date')
+        
+        # Create a complete week array
+        trend_data = []
+        labels = []
+        
+        for i in range(days):
+            current_date = start_date + timedelta(days=i)
+            day_name = current_date.strftime('%a')  # Mon, Tue, etc.
+            
+            # Find data for this date
+            day_data = weekly_data.filter(date=current_date).first()
+            
+            if day_data:
+                trend_data.append(round(day_data.total_accuracy, 1))
+            else:
+                trend_data.append(0)
+            
+            # Create labels (show day names for better UX)
+            if i == 0:
+                labels.append(f"{days-1}d ago")
+            elif i == days - 1:
+                labels.append("Today")
+            else:
+                labels.append(day_name)
+        
+        return {
+            'accuracy': trend_data,
+            'speed': [round(day_data.total_speed, 1) if day_data else 0 for day_data in weekly_data],
+            'labels': labels,
+            'current_accuracy': trend_data[-1] if trend_data else 0,
+            'current_speed': weekly_data.last().total_speed if weekly_data.exists() else 0,
+            'weekly_progress': round(trend_data[-1] - trend_data[0], 1) if len(trend_data) > 1 else 0
+        }
