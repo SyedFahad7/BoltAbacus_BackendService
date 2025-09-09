@@ -575,7 +575,7 @@ def generatePVPQuestion(difficulty_level='medium'):
         
         numbers = []
         for i in range(num_operands):
-            numbers.append(random.randint(1, 20))
+                numbers.append(random.randint(1, 20))
         
         # Generate question string
         question_str = str(numbers[0])
@@ -3059,6 +3059,52 @@ class GetUserExperience(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetUserDetails(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers using .get() to avoid KeyError
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            user_data = {
+                'id': user.userId,
+                'firstName': user.firstName,
+                'lastName': user.lastName,
+                'email': user.email,
+                'phone': user.phone,
+                'organizationName': user.organizationName,
+                'role': user.role
+            }
+            
+            return Response({
+                'success': True,
+                'data': user_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class GetWeeklyStats(APIView):
     permission_classes = [AllowAny]
 
@@ -3770,12 +3816,7 @@ class StartPVPGame(APIView):
                     Constants.JSON_MESSAGE: f"Need {max_players} players to start the game. Currently have {current_player_count} players."
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Check if all players are ready
-            ready_players = players.filter(is_ready=True).count()
-            if ready_players < current_player_count:
-                return Response({
-                    Constants.JSON_MESSAGE: f"All players must be ready to start. {current_player_count - ready_players} players are not ready."
-                }, status=status.HTTP_400_BAD_REQUEST)
+            # All players are considered ready by default (no ready check needed)
             
             # Update room status to active
             room.status = 'active'
@@ -3877,9 +3918,9 @@ class SubmitPVPGameResult(APIView):
                 is_draw = len(set(scores)) == 1 and len(scores) > 1
                 
                 if is_draw:
-                    # It's a draw - all players get 25 XP
+                    # It's a draw - all players get 20 XP
                     winner = None
-                    experience_awarded = 25
+                    experience_awarded = 20
                     
                     # Award 25 XP to all players
                     for player in all_players:
@@ -3887,7 +3928,7 @@ class SubmitPVPGameResult(APIView):
                             user=player.player,
                             defaults={'experience_points': 0, 'level': 1}
                         )
-                        user_exp.experience_points += 25
+                        user_exp.experience_points += 20
                         user_exp.level = (user_exp.experience_points // 100) + 1
                         user_exp.save()
                     
@@ -3898,7 +3939,7 @@ class SubmitPVPGameResult(APIView):
                         winner_score=scores[0],  # All have same score
                         winner_correct_answers=finished_players.first().correct_answers,
                         winner_time=finished_players.first().total_time,
-                        experience_awarded=25
+                        experience_awarded=20
                     )
                     
                     result_data = {
@@ -3906,7 +3947,7 @@ class SubmitPVPGameResult(APIView):
                         'is_draw': True,
                         'winner_name': None,
                         'winner_score': scores[0],
-                        'experience_awarded': 25,
+                        'experience_awarded': 20,
                         'total_players': all_players.count()
                     }
                 else:
@@ -3920,7 +3961,7 @@ class SubmitPVPGameResult(APIView):
                         winner_score=winner.score if winner else 0,
                         winner_correct_answers=winner.correct_answers if winner else 0,
                         winner_time=winner.total_time if winner else 0,
-                        experience_awarded=50 if winner else 10  # Winner gets 50 XP, others get 10 XP
+                        experience_awarded=50 if winner else 20  # Winner gets 50 XP, draw gives 20 each (handled above), losers 10
                     )
                     
                     # Award experience to winner
@@ -3935,7 +3976,7 @@ class SubmitPVPGameResult(APIView):
                     
                     # Award experience to all participants
                     for player in all_players:
-                        if player.player != winner.player:
+                        if winner and player.player != winner.player:
                             user_exp, created = UserExperience.objects.get_or_create(
                                 user=player.player,
                                 defaults={'experience_points': 0, 'level': 1}
