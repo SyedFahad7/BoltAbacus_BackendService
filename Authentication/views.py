@@ -528,6 +528,97 @@ def ConvertToString(questionJson):
 
         return question
 
+def calculateAbacusStyle(question_str):
+    """
+    Calculate abacus-style (left-to-right, no BODMAS) and avoid fractions
+    Handles special operations like squares (²) and square roots (√)
+    """
+    import re
+    
+    # Remove the " = ?" part
+    expression = question_str.replace(" = ?", "")
+    
+    # Replace × with * and ÷ with / for easier parsing
+    expression = expression.replace(" × ", " * ").replace(" ÷ ", " / ")
+    
+    # Handle special operations first (squares and roots)
+    # Process squares (²) - apply to the number before it
+    while '²' in expression:
+        # Find pattern: number²
+        match = re.search(r'(\d+)²', expression)
+        if match:
+            num = int(match.group(1))
+            squared = num ** 2
+            expression = expression.replace(match.group(0), str(squared))
+        else:
+            break
+    
+    # Process square roots (√) - apply to the number before it
+    while '√' in expression:
+        # Find pattern: number√
+        match = re.search(r'(\d+)√', expression)
+        if match:
+            num = int(match.group(1))
+            # For abacus, use integer square root
+            sqrt_val = int(num ** 0.5)
+            expression = expression.replace(match.group(0), str(sqrt_val))
+        else:
+            break
+    
+    # Process cube roots (∛) - apply to the number before it
+    while '∛' in expression:
+        # Find pattern: number∛
+        match = re.search(r'(\d+)∛', expression)
+        if match:
+            num = int(match.group(1))
+            # For abacus, use integer cube root
+            cbrt_val = int(num ** (1/3))
+            expression = expression.replace(match.group(0), str(cbrt_val))
+        else:
+            break
+    
+    # Process cubes (³) - apply to the number before it
+    while '³' in expression:
+        # Find pattern: number³
+        match = re.search(r'(\d+)³', expression)
+        if match:
+            num = int(match.group(1))
+            cubed = num ** 3
+            expression = expression.replace(match.group(0), str(cubed))
+        else:
+            break
+    
+    # Split by spaces to get numbers and operators
+    tokens = expression.split()
+    
+    if len(tokens) < 3:
+        return int(tokens[0]) if tokens else 0
+    
+    # Start with first number
+    result = int(tokens[0])
+    
+    # Process left to right
+    i = 1
+    while i < len(tokens) - 1:
+        operator = tokens[i]
+        next_num = int(tokens[i + 1])
+        
+        if operator == '+':
+            result += next_num
+        elif operator == '-':
+            result -= next_num
+        elif operator == '*':
+            result *= next_num
+        elif operator == '/':
+            # For division, ensure no fractions by using integer division
+            if next_num == 0:
+                next_num = 1  # Avoid division by zero
+            result = result // next_num
+        
+        i += 2
+    
+    return result
+
 def generateOptions(correct_answer):
     """Generate 4 options with the correct answer and 3 wrong answers"""
     import random
@@ -579,21 +670,22 @@ def generatePVPQuestion(difficulty_level='medium'):
         
         # Generate question string
         question_str = str(numbers[0])
-        answer = numbers[0]
         
         for i in range(1, num_operands):
             op = random.choice(operations)
             num = numbers[i]
             
             if op == '+':
-                answer += num
                 question_str += f" + {num}"
             elif op == '-':
                 # Ensure subtraction doesn't go negative
-                if answer <= num:
-                    num = answer // 2
-                answer -= num
+                if i == 1:  # First operation
+                    if numbers[0] <= num:
+                        num = numbers[0] // 2
                 question_str += f" - {num}"
+        
+        # Calculate answer using abacus-style (left-to-right, no BODMAS)
+        answer = calculateAbacusStyle(f"{question_str} = ?")
         
         # Ensure answer is positive
         if answer <= 0:
@@ -623,36 +715,30 @@ def generatePVPQuestion(difficulty_level='medium'):
                 numbers.append(random.randint(1, 10))
         
         question_str = str(numbers[0])
-        answer = numbers[0]
         
         for i in range(1, num_operands):
             op = random.choice(operations)
             num = numbers[i]
             
             if op == '+':
-                answer += num
                 question_str += f" + {num}"
             elif op == '-':
-                if answer <= num:
-                    num = answer // 2
-                answer -= num
+                # Ensure subtraction doesn't make result negative
+                if i == 1:  # First operation
+                    if numbers[0] <= num:
+                        num = numbers[0] // 2
                 question_str += f" - {num}"
             elif op == '*':
-                answer *= num
                 question_str += f" × {num}"
             elif op == '/':
-                if answer % num != 0:
-                    divisors = []
-                    for d in range(1, min(answer, 10) + 1):
-                        if answer % d == 0:
-                            divisors.append(d)
-                    if divisors:
-                        num = random.choice(divisors)
-                    else:
-                        num = 1
-                answer //= num
+                # For division, ensure it results in whole numbers
+                # We'll handle this in the calculation function
                 question_str += f" ÷ {num}"
         
+        # Calculate answer using abacus-style (left-to-right, no BODMAS)
+        answer = calculateAbacusStyle(f"{question_str} = ?")
+        
+        # Ensure answer is positive
         if answer <= 0:
             answer = abs(answer) + 1
         
@@ -679,48 +765,29 @@ def generatePVPQuestion(difficulty_level='medium'):
                 numbers.append(random.randint(1, 8))
         
         question_str = str(numbers[0])
-        answer = numbers[0]
         
         for i in range(1, num_operands):
             op = random.choice(operations)
             num = numbers[i]
             
             if op == '²':
-                answer = answer ** 2
                 question_str += "²"
             elif op == '√':
-                # Ensure square root results in whole number
-                perfect_square = int(answer ** 0.5) ** 2
-                if perfect_square == answer:
-                    answer = int(answer ** 0.5)
-                    question_str += "√"
-                else:
-                    # If not perfect square, use multiplication
-                    answer *= num
-                    question_str += f" × {num}"
+                question_str += "√"
             elif op == '+':
-                answer += num
                 question_str += f" + {num}"
             elif op == '-':
-                if answer <= num:
-                    num = answer // 2
-                answer -= num
+                if i == 1:  # First operation
+                    if numbers[0] <= num:
+                        num = numbers[0] // 2
                 question_str += f" - {num}"
             elif op == '*':
-                answer *= num
                 question_str += f" × {num}"
             elif op == '/':
-                if answer % num != 0:
-                    divisors = []
-                    for d in range(1, min(answer, 8) + 1):
-                        if answer % d == 0:
-                            divisors.append(d)
-                    if divisors:
-                        num = random.choice(divisors)
-                    else:
-                        num = 1
-                answer //= num
                 question_str += f" ÷ {num}"
+        
+        # Calculate answer using abacus-style (left-to-right, no BODMAS)
+        answer = calculateAbacusStyle(f"{question_str} = ?")
         
         if answer <= 0:
             answer = abs(answer) + 1
@@ -748,57 +815,33 @@ def generatePVPQuestion(difficulty_level='medium'):
                 numbers.append(random.randint(1, 10))
         
         question_str = str(numbers[0])
-        answer = numbers[0]
         
         for i in range(1, num_operands):
             op = random.choice(operations)
             num = numbers[i]
             
             if op == '²':
-                answer = answer ** 2
                 question_str += "²"
             elif op == '³':
-                answer = answer ** 3
                 question_str += "³"
             elif op == '√':
-                perfect_square = int(answer ** 0.5) ** 2
-                if perfect_square == answer:
-                    answer = int(answer ** 0.5)
-                    question_str += "√"
-                else:
-                    answer *= num
-                    question_str += f" × {num}"
+                question_str += "√"
             elif op == '∛':
-                perfect_cube = int(answer ** (1/3)) ** 3
-                if perfect_cube == answer:
-                    answer = int(answer ** (1/3))
-                    question_str += "∛"
-                else:
-                    answer *= num
-                    question_str += f" × {num}"
+                question_str += "∛"
             elif op == '+':
-                answer += num
                 question_str += f" + {num}"
             elif op == '-':
-                if answer <= num:
-                    num = answer // 2
-                answer -= num
+                if i == 1:  # First operation
+                    if numbers[0] <= num:
+                        num = numbers[0] // 2
                 question_str += f" - {num}"
             elif op == '*':
-                answer *= num
                 question_str += f" × {num}"
             elif op == '/':
-                if answer % num != 0:
-                    divisors = []
-                    for d in range(1, min(answer, 10) + 1):
-                        if answer % d == 0:
-                            divisors.append(d)
-                    if divisors:
-                        num = random.choice(divisors)
-                    else:
-                        num = 1
-                answer //= num
                 question_str += f" ÷ {num}"
+        
+        # Calculate answer using abacus-style (left-to-right, no BODMAS)
+        answer = calculateAbacusStyle(f"{question_str} = ?")
         
         if answer <= 0:
             answer = abs(answer) + 1
@@ -3962,7 +4005,11 @@ class SubmitPVPGameResult(APIView):
                 # All players finished, determine winner
                 # Check if it's a draw (all players have same score)
                 scores = [p.score for p in finished_players]
+                print(f"Debug: All scores: {scores}")
+                print(f"Debug: Unique scores: {set(scores)}")
+                print(f"Debug: Number of unique scores: {len(set(scores))}")
                 is_draw = len(set(scores)) == 1 and len(scores) > 1
+                print(f"Debug: Is draw: {is_draw}")
                 
                 if is_draw:
                     # It's a draw - all players get 20 XP
@@ -4032,12 +4079,15 @@ class SubmitPVPGameResult(APIView):
                             user_exp.level = (user_exp.experience_points // 100) + 1
                             user_exp.save()
                     
+                    # Determine if current user is the winner
+                    current_user_is_winner = winner and winner.player == user
+                    
                     result_data = {
-                        'is_winner': winner.player == user if winner else False,
+                        'is_winner': current_user_is_winner,
                         'is_draw': False,
                         'winner_name': f"{winner.player.firstName} {winner.player.lastName}" if winner else None,
                         'winner_score': winner.score if winner else 0,
-                        'experience_awarded': 50 if winner and winner.player == user else 10,
+                        'experience_awarded': 50 if current_user_is_winner else 10,
                         'total_players': all_players.count()
                     }
                 
