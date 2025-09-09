@@ -3209,15 +3209,22 @@ class GetUserStats(APIView):
                     user_rank = i + 1
                     break
             
-            # Calculate XP to next level
+            # Calculate current level based on experience points
             if user_exp.experience_points <= 90:
+                current_level = 1
                 next_level_xp = 100 - user_exp.experience_points
             else:
+                current_level = ((user_exp.experience_points - 90) // 100) + 2
                 next_level_xp = 100 - ((user_exp.experience_points - 90) % 100)
+            
+            # Update the user's level if it's different
+            if user_exp.level != current_level:
+                user_exp.level = current_level
+                user_exp.save()
             
             stats_data = {
                 'total_xp': user_exp.experience_points,
-                'level': user_exp.level,
+                'level': current_level,
                 'rank': user_rank,
                 'total_players': users_with_xp.count(),
                 'next_level_xp': next_level_xp
@@ -4437,21 +4444,27 @@ class GetPVPLeaderboard(APIView):
 
     def post(self, request):
         try:
-            # Get top 10 players by experience points
-            top_players = UserExperience.objects.select_related('user').order_by('-experience_points')[:10]
+            # Get top 10 players by experience points (only those with XP > 0)
+            top_players = UserExperience.objects.select_related('user').filter(experience_points__gt=0).order_by('-experience_points')[:10]
             
-            print(f"Debug: Found {top_players.count()} players with experience")
+            print(f"Debug: Found {top_players.count()} players with experience > 0")
             for player in top_players:
                 print(f"Debug: Player {player.user.firstName} - XP: {player.experience_points}")
             
             leaderboard_data = []
             for rank, player in enumerate(top_players, 1):
+                # Calculate current level based on experience points
+                if player.experience_points <= 90:
+                    current_level = 1
+                else:
+                    current_level = ((player.experience_points - 90) // 100) + 2
+                
                 leaderboard_data.append({
                     'rank': rank,
                     'user_id': player.user.userId,
                     'name': f"{player.user.firstName} {player.user.lastName}",
                     'experience_points': player.experience_points,
-                    'level': player.level
+                    'level': current_level
                 })
             
             return Response({
