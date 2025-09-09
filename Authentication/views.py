@@ -535,91 +535,103 @@ def calculateAbacusStyle(question_str):
     """
     import re
     
-    # Remove the " = ?" part
-    expression = question_str.replace(" = ?", "")
-    
-    # Replace × with * and ÷ with / for easier parsing
-    expression = expression.replace(" × ", " * ").replace(" ÷ ", " / ")
-    
-    # Handle special operations first (squares and roots)
-    # Process squares (²) - apply to the number before it
-    while '²' in expression:
-        # Find pattern: number²
-        match = re.search(r'(\d+)²', expression)
-        if match:
-            num = int(match.group(1))
-            squared = num ** 2
-            expression = expression.replace(match.group(0), str(squared))
-        else:
-            break
-    
-    # Process square roots (√) - apply to the number before it
-    while '√' in expression:
-        # Find pattern: number√
-        match = re.search(r'(\d+)√', expression)
-        if match:
-            num = int(match.group(1))
-            # For abacus, use integer square root
-            sqrt_val = int(num ** 0.5)
-            expression = expression.replace(match.group(0), str(sqrt_val))
-        else:
-            break
-    
-    # Process cube roots (∛) - apply to the number before it
-    while '∛' in expression:
-        # Find pattern: number∛
-        match = re.search(r'(\d+)∛', expression)
-        if match:
-            num = int(match.group(1))
-            # For abacus, use integer cube root
-            cbrt_val = int(num ** (1/3))
-            expression = expression.replace(match.group(0), str(cbrt_val))
-        else:
-            break
-    
-    # Process cubes (³) - apply to the number before it
-    while '³' in expression:
-        # Find pattern: number³
-        match = re.search(r'(\d+)³', expression)
-        if match:
-            num = int(match.group(1))
-            cubed = num ** 3
-            expression = expression.replace(match.group(0), str(cubed))
-        else:
-            break
-    
-    # Split by spaces to get numbers and operators
-    tokens = expression.split()
-    
-    if len(tokens) < 3:
-        return int(tokens[0]) if tokens else 0
-    
-    # Start with first number
-    result = int(tokens[0])
-    
-    # Process left to right
-    i = 1
-    while i < len(tokens) - 1:
-        operator = tokens[i]
-        next_num = int(tokens[i + 1])
+    try:
+        # Remove the " = ?" part
+        expression = question_str.replace(" = ?", "")
         
-        if operator == '+':
-            result += next_num
-        elif operator == '-':
-            result -= next_num
-        elif operator == '*':
-            result *= next_num
-        elif operator == '/':
-            # For division
-            if next_num == 0:
-                next_num = 1  # no division by zero
-            result = result // next_num
-            if result == 0:
-                result = 1
+        # Replace × with * and ÷ with / for easier parsing
+        expression = expression.replace(" × ", " * ").replace(" ÷ ", " / ")
         
-        i += 2
+        # Handle special operations first (squares and roots)
+        # Process squares (²) - apply to the number before it
+        while '²' in expression:
+            # Find pattern: number²
+            match = re.search(r'(\d+)²', expression)
+            if match:
+                num = int(match.group(1))
+                squared = num ** 2
+                expression = expression.replace(match.group(0), str(squared))
+            else:
+                break
+        
+        # Process square roots (√) - apply to the number before it
+        while '√' in expression:
+            # Find pattern: number√
+            match = re.search(r'(\d+)√', expression)
+            if match:
+                num = int(match.group(1))
+                # For abacus, use integer square root
+                sqrt_val = int(num ** 0.5)
+                expression = expression.replace(match.group(0), str(sqrt_val))
+            else:
+                break
+        
+        # Process cube roots (∛) - apply to the number before it
+        while '∛' in expression:
+            # Find pattern: number∛
+            match = re.search(r'(\d+)∛', expression)
+            if match:
+                num = int(match.group(1))
+                # For abacus, use integer cube root
+                cbrt_val = int(num ** (1/3))
+                expression = expression.replace(match.group(0), str(cbrt_val))
+            else:
+                break
+        
+        # Process cubes (³) - apply to the number before it
+        while '³' in expression:
+            # Find pattern: number³
+            match = re.search(r'(\d+)³', expression)
+            if match:
+                num = int(match.group(1))
+                cubed = num ** 3
+                expression = expression.replace(match.group(0), str(cubed))
+            else:
+                break
+        
+        # Split by spaces to get numbers and operators
+        tokens = expression.split()
+        
+        if len(tokens) < 3:
+            return int(tokens[0]) if tokens else 0
+        
+        # Start with first number
+        result = int(tokens[0])
+        
+        # Process left to right
+        i = 1
+        while i < len(tokens) - 1:
+            operator = tokens[i]
+            next_num = int(tokens[i + 1])
+            
+            if operator == '+':
+                result += next_num
+            elif operator == '-':
+                result -= next_num
+            elif operator == '*':
+                result *= next_num
+            elif operator == '/':
+                # For division
+                if next_num == 0:
+                    next_num = 1  # no division by zero
+                result = result // next_num
+                if result == 0:
+                    result = 1
+            
+            i += 2
+        
+        return result
     
-    return result
+    except Exception as e:
+        print(f"Error in calculateAbacusStyle: {e}")
+        print(f"Question string: {question_str}")
+        # Return a simple fallback calculation
+        try:
+            # Simple fallback: just add all numbers
+            numbers = re.findall(r'\d+', question_str)
+            return sum(int(num) for num in numbers) if numbers else 1
+        except:
+            return 1
 
 def generateOptions(correct_answer):
     """Generate 4 options with the correct answer and 3 wrong answers"""
@@ -815,8 +827,8 @@ def generatePVPQuestion(difficulty_level='medium'):
         }
     
     else:  # expert
-        # Expert: 20+ operands, includes cube roots and complex combinations
-        num_operands = random.randint(20, 30)
+        # Expert: 15-20 operands, includes cube roots and complex combinations
+        num_operands = random.randint(15, 20)
         operations = ['+', '-', '*', '/', '²', '³', '√', '∛']
         
         numbers = []
@@ -3936,16 +3948,42 @@ class StartPVPGame(APIView):
             questions = []
             print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}")
             for i in range(room.number_of_questions):
-                question_data = generatePVPQuestion(room.difficulty_level)
-                print(f"Debug: Question {i+1} data: {question_data}")
-                questions.append({
-                    'question_id': i + 1,
-                    'question': question_data['question'],
-                    'correct_answer': question_data['answer'],
-                    'options': question_data['options']
-                })
+                try:
+                    question_data = generatePVPQuestion(room.difficulty_level)
+                    print(f"Debug: Question {i+1} data: {question_data}")
+                    
+                    # Validate question data
+                    if not question_data or 'question' not in question_data or 'answer' not in question_data or 'options' not in question_data:
+                        print(f"Debug: Invalid question data for question {i+1}, skipping...")
+                        continue
+                    
+                    # Ensure answer is a valid integer
+                    if not isinstance(question_data['answer'], int) or question_data['answer'] <= 0:
+                        print(f"Debug: Invalid answer for question {i+1}: {question_data['answer']}, skipping...")
+                        continue
+                    
+                    questions.append({
+                        'question_id': i + 1,
+                        'question': question_data['question'],
+                        'correct_answer': question_data['answer'],
+                        'options': question_data['options']
+                    })
+                except Exception as e:
+                    print(f"Debug: Error generating question {i+1}: {e}")
+                    continue
             
             print(f"Debug: Generated {len(questions)} questions")
+            
+            # If no questions were generated, create fallback questions
+            if len(questions) == 0:
+                print("Debug: No questions generated, creating fallback questions...")
+                for i in range(room.number_of_questions):
+                    questions.append({
+                        'question_id': i + 1,
+                        'question': f"{i + 1} + {i + 2} = ?",
+                        'correct_answer': (i + 1) + (i + 2),
+                        'options': [(i + 1) + (i + 2), (i + 1) + (i + 2) + 1, (i + 1) + (i + 2) - 1, (i + 1) + (i + 2) + 2]
+                    })
             
             # Store questions in game session (you might want to create a separate model for this)
             game_session.questions_data = questions
