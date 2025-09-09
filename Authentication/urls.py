@@ -73,6 +73,8 @@ urlpatterns = [
     path('submitPVPGameResult/', views.SubmitPVPGameResult.as_view()),
     path('getUserExperience/', views.GetUserExperience.as_view()),
     path('getUserDetails/', views.GetUserDetails.as_view()),
+    path('community-stats/', views.GetCommunityStats.as_view()),
+    path('user-stats/', views.GetUserStats.as_view()),
     path('getPVPGameQuestions/', views.GetPVPGameQuestions.as_view()),
     path('getPVPGameResult/', views.GetPVPGameResult.as_view()),
     path('updatePlayerProgress/', views.UpdatePlayerProgress.as_view()),

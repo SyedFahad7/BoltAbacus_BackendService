@@ -376,8 +376,11 @@ class PVPConsumer(AsyncWebsocketConsumer):
         )
         user_exp.experience_points += xp_amount
         
-        # Calculate level (every 100 XP = 1 level)
-        new_level = (user_exp.experience_points // 100) + 1
+        # Calculate level: 0-90 = Level 1, 100+ = Level 2+
+        if user_exp.experience_points <= 90:
+            new_level = 1
+        else:
+            new_level = ((user_exp.experience_points - 90) // 100) + 2
         user_exp.level = new_level
         user_exp.save()
         

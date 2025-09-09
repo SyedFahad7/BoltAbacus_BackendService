@@ -3110,16 +3110,122 @@ class GetUserExperience(APIView):
                 defaults={'experience_points': 0, 'level': 1}
             )
             
+            # Calculate XP to next level based on new system
+            if user_exp.experience_points <= 90:
+                xp_to_next = 100 - user_exp.experience_points
+            else:
+                xp_to_next = 100 - ((user_exp.experience_points - 90) % 100)
+            
             exp_data = {
                 'user_id': user.userId,
                 'experience_points': user_exp.experience_points,
                 'level': user_exp.level,
-                'xp_to_next_level': 100 - (user_exp.experience_points % 100)
+                'xp_to_next_level': xp_to_next
             }
             
             return Response({
                 'success': True,
                 'data': exp_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetCommunityStats(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Get total active players (users with XP > 0)
+            active_players = UserExperience.objects.filter(experience_points__gt=0).count()
+            
+            # Get unique countries (assuming we have a country field in UserDetails)
+            countries = UserDetails.objects.values('country').distinct().exclude(country__isnull=True).exclude(country='').count()
+            
+            # Get problems solved today (this would need to be tracked in a separate model)
+            # For now, we'll use a placeholder calculation
+            from datetime import date
+            today = date.today()
+            problems_solved_today = 0  # This would need to be calculated from actual practice data
+            
+            # Get average accuracy (this would need to be calculated from practice results)
+            # For now, we'll use a placeholder
+            average_accuracy = 85.0  # This would need to be calculated from actual data
+            
+            stats_data = {
+                'active_players': active_players,
+                'countries': countries,
+                'problems_solved_today': problems_solved_today,
+                'average_accuracy': average_accuracy
+            }
+            
+            return Response({
+                'success': True,
+                'data': stats_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetUserStats(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            user_exp, created = UserExperience.objects.get_or_create(
+                user=user,
+                defaults={'experience_points': 0, 'level': 1}
+            )
+            
+            # Calculate user's rank among all users with XP > 0
+            users_with_xp = UserExperience.objects.filter(experience_points__gt=0).order_by('-experience_points')
+            user_rank = 0
+            for i, exp in enumerate(users_with_xp):
+                if exp.user == user:
+                    user_rank = i + 1
+                    break
+            
+            # Calculate XP to next level
+            if user_exp.experience_points <= 90:
+                next_level_xp = 100 - user_exp.experience_points
+            else:
+                next_level_xp = 100 - ((user_exp.experience_points - 90) % 100)
+            
+            stats_data = {
+                'total_xp': user_exp.experience_points,
+                'level': user_exp.level,
+                'rank': user_rank,
+                'total_players': users_with_xp.count(),
+                'next_level_xp': next_level_xp
+            }
+            
+            return Response({
+                'success': True,
+                'data': stats_data
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -4077,7 +4183,11 @@ class SubmitPVPGameResult(APIView):
                             defaults={'experience_points': 0, 'level': 1}
                         )
                         user_exp.experience_points += 20
-                        user_exp.level = (user_exp.experience_points // 100) + 1
+                        # Level calculation: 0-90 = Level 1, 100+ = Level 2+
+                        if user_exp.experience_points <= 90:
+                            user_exp.level = 1
+                        else:
+                            user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
                         user_exp.save()
                     
                     # Create game result for draw
@@ -4119,7 +4229,11 @@ class SubmitPVPGameResult(APIView):
                             defaults={'experience_points': 0, 'level': 1}
                         )
                         user_exp.experience_points += 50
-                        user_exp.level = (user_exp.experience_points // 100) + 1
+                        # Level calculation: 0-90 = Level 1, 100+ = Level 2+
+                        if user_exp.experience_points <= 90:
+                            user_exp.level = 1
+                        else:
+                            user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
                         user_exp.save()
                     
                     # Award experience to all participants
@@ -4130,7 +4244,11 @@ class SubmitPVPGameResult(APIView):
                                 defaults={'experience_points': 0, 'level': 1}
                             )
                             user_exp.experience_points += 10
-                            user_exp.level = (user_exp.experience_points // 100) + 1
+                            # Level calculation: 0-90 = Level 1, 100+ = Level 2+
+                        if user_exp.experience_points <= 90:
+                            user_exp.level = 1
+                        else:
+                            user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
                             user_exp.save()
                     
                     # Determine if current user is the winner
@@ -4150,6 +4268,8 @@ class SubmitPVPGameResult(APIView):
                         'experience_awarded': 50 if current_user_is_winner else 10,
                         'total_players': all_players.count()
                     }
+                    
+                    print(f"Debug: Final result_data: {result_data}")
                 
                 # Update room status to finished (for both draw and normal game)
                 room.status = 'finished'
