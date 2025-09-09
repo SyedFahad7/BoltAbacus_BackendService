@@ -575,7 +575,7 @@ def generatePVPQuestion(difficulty_level='medium'):
         
         numbers = []
         for i in range(num_operands):
-                numbers.append(random.randint(1, 20))
+            numbers.append(random.randint(1, 20))
         
         # Generate question string
         question_str = str(numbers[0])
@@ -667,8 +667,8 @@ def generatePVPQuestion(difficulty_level='medium'):
         }
     
     elif difficulty_level == 'hard':
-        # Hard: 10+ operands, includes squares and square roots
-        num_operands = random.randint(10, 15)
+        # Hard: 15+ operands, includes squares and square roots
+        num_operands = random.randint(15, 20)
         operations = ['+', '-', '*', '/', '²', '√']
         
         numbers = []
@@ -736,8 +736,8 @@ def generatePVPQuestion(difficulty_level='medium'):
         }
     
     else:  # expert
-        # Expert: 10+ operands, includes cube roots and complex combinations
-        num_operands = random.randint(10, 20)
+        # Expert: 20+ operands, includes cube roots and complex combinations
+        num_operands = random.randint(20, 30)
         operations = ['+', '-', '*', '/', '²', '³', '√', '∛']
         
         numbers = []
@@ -3091,14 +3091,61 @@ class GetUserDetails(APIView):
                 'firstName': user.firstName,
                 'lastName': user.lastName,
                 'email': user.email,
-                'phone': user.phoneNumber,  # Fixed: use phoneNumber instead of phone
-                'organizationName': user.tag.organizationName if user.tag else 'Unknown',  # Fixed: get from tag
+                'phone': user.phoneNumber,  # Fahad: use phoneNumber instead of phone as received from the UserDetails model.
+                'organizationName': user.tag.organizationName if user.tag else 'Unknown',
                 'role': user.role
             }
             
             return Response({
                 'success': True,
                 'data': user_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPVPGameQuestions(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            room_id = request.data.get('room_id')
+            if not room_id:
+                return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            room = PVPRoom.objects.filter(room_id=room_id).first()
+            if not room:
+                return Response({Constants.JSON_MESSAGE: "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if room is active
+            if room.status != 'active':
+                return Response({Constants.JSON_MESSAGE: "Game is not active"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get game session
+            game_session = PVPGameSession.objects.filter(room=room, is_active=True).first()
+            if not game_session:
+                return Response({Constants.JSON_MESSAGE: "Game session not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'questions': game_session.questions_data,
+                    'total_questions': room.number_of_questions,
+                    'time_per_question': room.time_per_question
+                }
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
