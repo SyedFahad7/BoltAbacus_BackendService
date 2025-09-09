@@ -4236,7 +4236,7 @@ class SubmitPVPGameResult(APIView):
                             user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
                         user_exp.save()
                     
-                    # Award experience to all participants
+                    # Award experience to all participants (losers)
                     for player in all_players:
                         if winner and player.player != winner.player:
                             user_exp, created = UserExperience.objects.get_or_create(
@@ -4245,10 +4245,10 @@ class SubmitPVPGameResult(APIView):
                             )
                             user_exp.experience_points += 10
                             # Level calculation: 0-90 = Level 1, 100+ = Level 2+
-                        if user_exp.experience_points <= 90:
-                            user_exp.level = 1
-                        else:
-                            user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
+                            if user_exp.experience_points <= 90:
+                                user_exp.level = 1
+                            else:
+                                user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
                             user_exp.save()
                     
                     # Determine if current user is the winner
