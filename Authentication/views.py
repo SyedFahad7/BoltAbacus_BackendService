@@ -3091,8 +3091,8 @@ class GetUserDetails(APIView):
                 'firstName': user.firstName,
                 'lastName': user.lastName,
                 'email': user.email,
-                'phone': user.phone,
-                'organizationName': user.organizationName,
+                'phone': user.phoneNumber,  # Fixed: use phoneNumber instead of phone
+                'organizationName': user.tag.organizationName if user.tag else 'Unknown',  # Fixed: get from tag
                 'role': user.role
             }
             
