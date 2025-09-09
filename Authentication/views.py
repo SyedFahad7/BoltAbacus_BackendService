@@ -610,10 +610,12 @@ def calculateAbacusStyle(question_str):
         elif operator == '*':
             result *= next_num
         elif operator == '/':
-            # For division, ensure no fractions by using integer division
+            # For division
             if next_num == 0:
-                next_num = 1  # Avoid division by zero
+                next_num = 1  # no division by zero
             result = result // next_num
+            if result == 0:
+                result = 1
         
         i += 2
     
@@ -732,7 +734,17 @@ def generatePVPQuestion(difficulty_level='medium'):
                 question_str += f" × {num}"
             elif op == '/':
                 # For division, ensure it results in whole numbers
-                # We'll handle this in the calculation function
+                # Only use divisors that will result in whole numbers
+                if i == 1:  # First operation
+                    # For first division, ensure the first number is divisible
+                    if numbers[0] % num != 0:
+                        # Find a divisor that works
+                        for d in range(1, min(numbers[0], 10) + 1):
+                            if numbers[0] % d == 0:
+                                num = d
+                                break
+                        else:
+                            num = 1
                 question_str += f" ÷ {num}"
         
         # Calculate answer using abacus-style (left-to-right, no BODMAS)
@@ -3922,14 +3934,18 @@ class StartPVPGame(APIView):
             
             # Generate questions for the game
             questions = []
+            print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}")
             for i in range(room.number_of_questions):
                 question_data = generatePVPQuestion(room.difficulty_level)
+                print(f"Debug: Question {i+1} data: {question_data}")
                 questions.append({
                     'question_id': i + 1,
                     'question': question_data['question'],
                     'correct_answer': question_data['answer'],
                     'options': question_data['options']
                 })
+            
+            print(f"Debug: Generated {len(questions)} questions")
             
             # Store questions in game session (you might want to create a separate model for this)
             game_session.questions_data = questions
@@ -4081,6 +4097,12 @@ class SubmitPVPGameResult(APIView):
                     
                     # Determine if current user is the winner
                     current_user_is_winner = winner and winner.player == user
+                    
+                    print(f"Debug: Winner player: {winner.player.firstName if winner else 'None'}")
+                    print(f"Debug: Current user: {user.firstName}")
+                    print(f"Debug: Current user is winner: {current_user_is_winner}")
+                    print(f"Debug: Winner score: {winner.score if winner else 'None'}")
+                    print(f"Debug: Current user score: {score}")
                     
                     result_data = {
                         'is_winner': current_user_is_winner,
