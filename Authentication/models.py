@@ -169,6 +169,7 @@ class PVPRoom(models.Model):
     number_of_questions = models.IntegerField(default=10)
     time_per_question = models.IntegerField(default=30)  # in seconds
     difficulty_level = models.CharField(max_length=10, choices=DIFFICULTY_CHOICES, default='medium')
+    number_of_digits = models.IntegerField(default=3)
     level_id = models.IntegerField(default=1)
     class_id = models.IntegerField(default=1)
     topic_id = models.IntegerField(default=1)

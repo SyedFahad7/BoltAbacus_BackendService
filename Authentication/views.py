@@ -660,225 +660,218 @@ def generateOptions(correct_answer):
     random.shuffle(options)
     return options
 
-def generatePVPQuestion(difficulty_level='medium'):
+def generatePVPQuestion(difficulty_level='medium', number_of_digits=3):
     """
     Generate a math question based on difficulty level for PVP games.
+    New format: Vertical operands with single operator
     
     Difficulty levels:
-    - Easy: 6-10 operands, basic operations (+, -) only
-    - Medium: 6-10 operands, includes multiplication and division
-    - Hard: 10+ operands, all operations including squares and square roots
-    - Expert: 10+ operands, includes cube roots, complex combinations
+    - Easy: Addition & Subtraction only, operands 2-5 digits
+    - Medium: Add, Sub, Multiply, operands 2-5 digits  
+    - Hard: Add, Sub, Multiply, Divide, operands 5-10 digits
+    - Expert: All + Square, Root, Cube, single operand for special operations
     """
     import random
     import math
     
+    # Generate operands based on number_of_digits
+    def generate_operand(digits):
+        if digits == 1:
+            return random.randint(1, 9)
+        else:
+            min_val = 10 ** (digits - 1)
+            max_val = (10 ** digits) - 1
+            return random.randint(min_val, max_val)
+    
     if difficulty_level == 'easy':
-        # Easy: 6-10 operands, only addition and subtraction
-        num_operands = random.randint(6, 10)
+        # Easy: Addition & Subtraction only, operands 2-5 digits
+        operand_range = random.randint(2, 5)
+        num_operands = random.randint(2, 4)
         operations = ['+', '-']
         
-        numbers = []
+        operands = []
         for i in range(num_operands):
-            numbers.append(random.randint(1, 20))
+            operands.append(generate_operand(operand_range))
         
-        # Generate question string
-        question_str = str(numbers[0])
+        operator = random.choice(operations)
         
-        for i in range(1, num_operands):
-            op = random.choice(operations)
-            num = numbers[i]
-            
-            if op == '+':
-                question_str += f" + {num}"
-            elif op == '-':
-                # Ensure subtraction doesn't go negative
-                if i == 1:  # First operation
-                    if numbers[0] <= num:
-                        num = numbers[0] // 2
-                question_str += f" - {num}"
-        
-        # Calculate answer using abacus-style (left-to-right, no BODMAS)
-        answer = calculateAbacusStyle(f"{question_str} = ?")
-        
-        # Ensure answer is positive
-        if answer <= 0:
-            answer = abs(answer) + 1
-        
-        # Generate 4 options with correct answer
-        options = generateOptions(answer)
+        # Calculate answer
+        if operator == '+':
+            answer = sum(operands)
+        else:  # subtraction
+            # Ensure positive result
+            answer = operands[0]
+            for i in range(1, len(operands)):
+                answer -= operands[i]
+            if answer <= 0:
+                # Regenerate to ensure positive result
+                operands[0] = sum(operands[1:]) + random.randint(1, 100)
+                answer = operands[0] - sum(operands[1:])
         
         return {
-            'question': f"{question_str} = ?",
-            'answer': answer,
-            'options': options,
-            'numbers': numbers,
-            'operations': operations[:num_operands-1]
+            'operands': operands,
+            'operator': operator,
+            'correct_answer': answer,
+            'question_type': 'basic'
         }
     
     elif difficulty_level == 'medium':
-        # Medium: 6-10 operands, includes multiplication and division
-        num_operands = random.randint(6, 10)
-        operations = ['+', '-', '*', '/']
+        # Medium: Add, Sub, Multiply, operands 2-5 digits
+        operand_range = random.randint(2, 5)
+        num_operands = random.randint(2, 3)
+        operations = ['+', '-', '*']
         
-        numbers = []
+        operands = []
         for i in range(num_operands):
-            if i == 0:
-                numbers.append(random.randint(1, 20))
-            else:
-                numbers.append(random.randint(1, 10))
+            operands.append(generate_operand(operand_range))
         
-        question_str = str(numbers[0])
+        operator = random.choice(operations)
         
-        for i in range(1, num_operands):
-            op = random.choice(operations)
-            num = numbers[i]
-            
-            if op == '+':
-                question_str += f" + {num}"
-            elif op == '-':
-                # Ensure subtraction doesn't make result negative
-                if i == 1:  # First operation
-                    if numbers[0] <= num:
-                        num = numbers[0] // 2
-                question_str += f" - {num}"
-            elif op == '*':
-                question_str += f" × {num}"
-            elif op == '/':
-                # For division, ensure it results in whole numbers
-                # Only use divisors that will result in whole numbers
-                if i == 1:  # First operation
-                    # For first division, ensure the first number is divisible
-                    if numbers[0] % num != 0:
-                        # Find a divisor that works
-                        for d in range(1, min(numbers[0], 10) + 1):
-                            if numbers[0] % d == 0:
-                                num = d
-                                break
-                        else:
-                            num = 1
-                question_str += f" ÷ {num}"
-        
-        # Calculate answer using abacus-style (left-to-right, no BODMAS)
-        answer = calculateAbacusStyle(f"{question_str} = ?")
-        
-        # Ensure answer is positive
-        if answer <= 0:
-            answer = abs(answer) + 1
-        
-        options = generateOptions(answer)
+        # Calculate answer
+        if operator == '+':
+            answer = sum(operands)
+        elif operator == '-':
+            answer = operands[0] - sum(operands[1:])
+            if answer <= 0:
+                operands[0] = sum(operands[1:]) + random.randint(1, 100)
+                answer = operands[0] - sum(operands[1:])
+        else:  # multiplication
+            answer = 1
+            for op in operands:
+                answer *= op
         
         return {
-            'question': f"{question_str} = ?",
-            'answer': answer,
-            'options': options,
-            'numbers': numbers,
-            'operations': operations[:num_operands-1]
+            'operands': operands,
+            'operator': operator,
+            'correct_answer': answer,
+            'question_type': 'basic'
         }
     
     elif difficulty_level == 'hard':
-        # Hard: 15+ operands, includes squares and square roots
-        num_operands = random.randint(15, 20)
-        operations = ['+', '-', '*', '/', '²', '√']
+        # Hard: Add, Sub, Multiply, Divide, operands 5-10 digits
+        operand_range = random.randint(5, 10)
+        num_operands = random.randint(2, 3)
+        operations = ['+', '-', '*', '/']
         
-        numbers = []
+        operands = []
         for i in range(num_operands):
-            if i == 0:
-                numbers.append(random.randint(1, 15))
-            else:
-                numbers.append(random.randint(1, 8))
+            operands.append(generate_operand(operand_range))
         
-        question_str = str(numbers[0])
+        operator = random.choice(operations)
         
-        for i in range(1, num_operands):
-            op = random.choice(operations)
-            num = numbers[i]
-            
-            if op == '²':
-                question_str += "²"
-            elif op == '√':
-                question_str += "√"
-            elif op == '+':
-                question_str += f" + {num}"
-            elif op == '-':
-                if i == 1:  # First operation
-                    if numbers[0] <= num:
-                        num = numbers[0] // 2
-                question_str += f" - {num}"
-            elif op == '*':
-                question_str += f" × {num}"
-            elif op == '/':
-                question_str += f" ÷ {num}"
-        
-        # Calculate answer using abacus-style (left-to-right, no BODMAS)
-        answer = calculateAbacusStyle(f"{question_str} = ?")
-        
-        if answer <= 0:
-            answer = abs(answer) + 1
-        
-        options = generateOptions(answer)
+        # Calculate answer
+        if operator == '+':
+            answer = sum(operands)
+        elif operator == '-':
+            answer = operands[0] - sum(operands[1:])
+            if answer <= 0:
+                operands[0] = sum(operands[1:]) + random.randint(1, 1000)
+                answer = operands[0] - sum(operands[1:])
+        elif operator == '*':
+            answer = 1
+            for op in operands:
+                answer *= op
+        else:  # division
+            # Ensure clean division
+            dividend = operands[0]
+            divisor = operands[1]
+            if dividend % divisor != 0:
+                # Make it divisible
+                dividend = divisor * random.randint(1, 100)
+                operands[0] = dividend
+            answer = dividend // divisor
         
         return {
-            'question': f"{question_str} = ?",
-            'answer': answer,
-            'options': options,
-            'numbers': numbers,
-            'operations': operations[:num_operands-1]
+            'operands': operands,
+            'operator': operator,
+            'correct_answer': answer,
+            'question_type': 'basic'
         }
     
     else:  # expert
-        # Expert: 15-20 operands, includes cube roots and complex combinations
-        num_operands = random.randint(15, 20)
-        operations = ['+', '-', '*', '/', '²', '³', '√', '∛']
+        # Expert: All + Square, Root, Cube, single operand for special operations
+        question_types = ['basic', 'square', 'square_root', 'cube', 'cube_root']
+        question_type = random.choice(question_types)
         
-        numbers = []
-        for i in range(num_operands):
-            if i == 0:
-                numbers.append(random.randint(1, 20))
-            else:
-                numbers.append(random.randint(1, 10))
-        
-        question_str = str(numbers[0])
-        
-        for i in range(1, num_operands):
-            op = random.choice(operations)
-            num = numbers[i]
+        if question_type == 'basic':
+            # Basic operations with larger numbers
+            operand_range = random.randint(3, 8)
+            num_operands = random.randint(2, 3)
+            operations = ['+', '-', '*', '/']
             
-            if op == '²':
-                question_str += "²"
-            elif op == '³':
-                question_str += "³"
-            elif op == '√':
-                question_str += "√"
-            elif op == '∛':
-                question_str += "∛"
-            elif op == '+':
-                question_str += f" + {num}"
-            elif op == '-':
-                if i == 1:  # First operation
-                    if numbers[0] <= num:
-                        num = numbers[0] // 2
-                question_str += f" - {num}"
-            elif op == '*':
-                question_str += f" × {num}"
-            elif op == '/':
-                question_str += f" ÷ {num}"
+            operands = []
+            for i in range(num_operands):
+                operands.append(generate_operand(operand_range))
+            
+            operator = random.choice(operations)
+            
+            # Calculate answer
+            if operator == '+':
+                answer = sum(operands)
+            elif operator == '-':
+                answer = operands[0] - sum(operands[1:])
+                if answer <= 0:
+                    operands[0] = sum(operands[1:]) + random.randint(1, 1000)
+                    answer = operands[0] - sum(operands[1:])
+            elif operator == '*':
+                answer = 1
+                for op in operands:
+                    answer *= op
+            else:  # division
+                dividend = operands[0]
+                divisor = operands[1]
+                if dividend % divisor != 0:
+                    dividend = divisor * random.randint(1, 100)
+                    operands[0] = dividend
+                answer = dividend // divisor
+            
+            return {
+                'operands': operands,
+                'operator': operator,
+                'correct_answer': answer,
+                'question_type': 'basic'
+            }
         
-        # Calculate answer using abacus-style (left-to-right, no BODMAS)
-        answer = calculateAbacusStyle(f"{question_str} = ?")
-        
-        if answer <= 0:
-            answer = abs(answer) + 1
-        
-        options = generateOptions(answer)
-        
-        return {
-            'question': f"{question_str} = ?",
-            'answer': answer,
-            'options': options,
-            'numbers': numbers,
-            'operations': operations[:num_operands-1]
-        }
+        else:
+            # Special operations - single operand
+            operand = generate_operand(number_of_digits)
+            
+            if question_type == 'square':
+                answer = operand ** 2
+                return {
+                    'operands': [operand],
+                    'operator': '²',
+                    'correct_answer': answer,
+                    'question_type': 'square'
+                }
+            elif question_type == 'square_root':
+                # Ensure perfect square
+                operand = random.randint(1, 20) ** 2
+                answer = int(math.sqrt(operand))
+                return {
+                    'operands': [operand],
+                    'operator': '√',
+                    'correct_answer': answer,
+                    'question_type': 'square_root'
+                }
+            elif question_type == 'cube':
+                answer = operand ** 3
+                return {
+                    'operands': [operand],
+                    'operator': '³',
+                    'correct_answer': answer,
+                    'question_type': 'cube'
+                }
+            else:  # cube_root
+                # Ensure perfect cube
+                operand = random.randint(1, 10) ** 3
+                answer = int(round(operand ** (1/3)))
+                return {
+                    'operands': [operand],
+                    'operator': '∛',
+                    'correct_answer': answer,
+                    'question_type': 'cube_root'
+                }
 
 
 # -------------------- Admin Related APIs ----------------------
@@ -2920,7 +2913,8 @@ class CreatePVPRoom(APIView):
             
             def generate_room_code():
                 while True:
-                    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                    # Generate 6-digit numeric code
+                    code = ''.join(random.choices(string.digits, k=6))
                     if not PVPRoom.objects.filter(room_id=code).exists():
                         return code
             
@@ -3784,11 +3778,11 @@ class CreatePVPRoom(APIView):
             # Generate unique room code
             import random
             import string
-            room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            room_code = ''.join(random.choices(string.digits, k=6))
             
             # Ensure room code is unique
             while PVPRoom.objects.filter(room_id=room_code).exists():
-                room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                room_code = ''.join(random.choices(string.digits, k=6))
             
             # Create room
             room = PVPRoom.objects.create(
@@ -3798,6 +3792,7 @@ class CreatePVPRoom(APIView):
                 number_of_questions=request.data.get('number_of_questions', 10),
                 time_per_question=request.data.get('time_per_question', 30),
                 difficulty_level=request.data.get('difficulty_level', 'medium'),
+                number_of_digits=request.data.get('number_of_digits', 3),
                 status='waiting'
             )
             
@@ -4071,27 +4066,28 @@ class StartPVPGame(APIView):
             
             # Generate questions for the game
             questions = []
-            print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}")
+            print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}, digits: {room.number_of_digits}")
             for i in range(room.number_of_questions):
                 try:
-                    question_data = generatePVPQuestion(room.difficulty_level)
+                    question_data = generatePVPQuestion(room.difficulty_level, room.number_of_digits)
                     print(f"Debug: Question {i+1} data: {question_data}")
                     
                     # Validate question data
-                    if not question_data or 'question' not in question_data or 'answer' not in question_data or 'options' not in question_data:
+                    if not question_data or 'operands' not in question_data or 'correct_answer' not in question_data:
                         print(f"Debug: Invalid question data for question {i+1}, skipping...")
                         continue
                     
-                    # Ensure answer is a valid integer
-                    if not isinstance(question_data['answer'], int) or question_data['answer'] <= 0:
-                        print(f"Debug: Invalid answer for question {i+1}: {question_data['answer']}, skipping...")
+                    # Ensure answer is a valid number
+                    if not isinstance(question_data['correct_answer'], (int, float)) or question_data['correct_answer'] <= 0:
+                        print(f"Debug: Invalid answer for question {i+1}: {question_data['correct_answer']}, skipping...")
                         continue
                     
                     questions.append({
                         'question_id': i + 1,
-                        'question': question_data['question'],
-                        'correct_answer': question_data['answer'],
-                        'options': question_data['options']
+                        'operands': question_data['operands'],
+                        'operator': question_data['operator'],
+                        'correct_answer': question_data['correct_answer'],
+                        'question_type': question_data['question_type']
                     })
                 except Exception as e:
                     print(f"Debug: Error generating question {i+1}: {e}")
@@ -4105,9 +4101,10 @@ class StartPVPGame(APIView):
                 for i in range(room.number_of_questions):
                     questions.append({
                         'question_id': i + 1,
-                        'question': f"{i + 1} + {i + 2} = ?",
+                        'operands': [i + 1, i + 2],
+                        'operator': '+',
                         'correct_answer': (i + 1) + (i + 2),
-                        'options': [(i + 1) + (i + 2), (i + 1) + (i + 2) + 1, (i + 1) + (i + 2) - 1, (i + 1) + (i + 2) + 2]
+                        'question_type': 'basic'
                     })
             
             # Store questions in game session (you might want to create a separate model for this)
