@@ -4548,6 +4548,38 @@ class GetUserStreak(APIView):
                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetUserStreakById(APIView):
+    """Get any user's streak by userId (admin/public for leaderboard usage)."""
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            data = request.data or {}
+            target_user_id = data.get('userId')
+            if not target_user_id:
+                return Response({Constants.JSON_MESSAGE: 'userId is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                user = UserDetails.objects.get(userId=target_user_id)
+            except UserDetails.DoesNotExist:
+                return Response({Constants.JSON_MESSAGE: 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            try:
+                user_streak, created = UserStreak.get_or_create_streak(user)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: f"Error accessing streak data: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                'currentStreak': user_streak.current_streak,
+                'maxStreak': user_streak.max_streak,
+                'lastActivityDate': user_streak.last_activity_date.isoformat() if user_streak.last_activity_date else None,
+                'createdAt': user_streak.created_at.isoformat(),
+                'updatedAt': user_streak.updated_at.isoformat(),
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error fetching streak by id: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class UpdateUserStreak(APIView):
     """Update user's streak (increment for daily activity)"""
     authentication_classes = []  # Disable DRF authentication
