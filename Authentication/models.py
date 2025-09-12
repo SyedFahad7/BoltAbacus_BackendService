@@ -173,6 +173,8 @@ class PVPRoom(models.Model):
     level_id = models.IntegerField(default=1)
     class_id = models.IntegerField(default=1)
     topic_id = models.IntegerField(default=1)
+    game_mode = models.CharField(max_length=20, default='flashcards')  # flashcards, norush, timeattack, custom
+    operation = models.CharField(max_length=20, default='addition')  # addition, multiplication, division
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)

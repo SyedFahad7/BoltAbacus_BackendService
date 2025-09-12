@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from django.core.mail import EmailMessage
 from django.template import loader
 from . import Constants
+from django.db import models
 from Authentication.models import (UserDetails, Student,
                                    Batch, Curriculum,
                                    TopicDetails, QuizQuestions,
@@ -459,7 +460,6 @@ class data(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        temp()
         return Response(Constants.JSON_MESSAGE)
 
 
@@ -660,218 +660,216 @@ def generateOptions(correct_answer):
     random.shuffle(options)
     return options
 
-def generatePVPQuestion(difficulty_level='medium', number_of_digits=3):
+def generateRandomNumber(min_val, max_val):
+    """Generate a random number between min and max (inclusive)"""
+    import random
+    num = random.randint(min_val, max_val)
+    while num == 0:
+        num = random.randint(min_val, max_val)
+    return num
+
+def generatePracticeQuestions(operation, numberOfDigitsLeft, numberOfDigitsRight, numberOfQuestions, numberOfRows, zigZag, includeSubtraction, persistNumberOfDigits, includeDecimals, difficulty_level='medium'):
     """
-    Generate a math question based on difficulty level for PVP games.
-    New format: Vertical operands with single operator
-    
-    Difficulty levels:
-    - Easy: Addition & Subtraction only, operands 2-5 digits
-    - Medium: Add, Sub, Multiply, operands 2-5 digits  
-    - Hard: Add, Sub, Multiply, Divide, operands 5-10 digits
-    - Expert: All + Square, Root, Cube, single operand for special operations
+    Generate practice questions using the same logic as the frontend.
+    This ensures consistency between practice and PvP modes.
     """
     import random
     import math
     
-    # Generate operands based on number_of_digits
-    def generate_operand(digits):
-        if digits == 1:
-            return random.randint(1, 9)
-        else:
-            min_val = 10 ** (digits - 1)
-            max_val = (10 ** digits) - 1
-            return random.randint(min_val, max_val)
+    questions = []
     
+    for i in range(numberOfQuestions):
+        numbers = []
+        
+        if operation == 'addition':
+            for j in range(numberOfRows):
+                if difficulty_level == 'easy':
+                    # Easy: Use even numbers, numbers ending in 0, or simple patterns
+                    if random.random() < 0.5:
+                        # Even numbers
+                        currentMin = 2 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                        currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                        num = generateRandomNumber(currentMin, currentMax)
+                        if num % 2 != 0:
+                            num += 1
+                        numbers.append(num)
+                    else:
+                        # Numbers ending in 0
+                        currentMin = 10 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                        currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                        num = generateRandomNumber(currentMin, currentMax)
+                        num = (num // 10) * 10  # Make it end in 0
+                        numbers.append(num)
+                elif difficulty_level == 'medium':
+                    # Medium: Mix of easy and harder numbers
+                    currentMin = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                    currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                    numbers.append(generateRandomNumber(currentMin, currentMax))
+                else:  # hard
+                    # Hard: More complex numbers, larger ranges
+                    currentMin = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                    currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                    numbers.append(generateRandomNumber(currentMin, currentMax))
+            
+            if includeSubtraction:
+                # Ensure the cumulative sum is always positive at each step
+                for j in range(len(numbers)):
+                    if random.random() < 0.5:
+                        # Make this number negative, but ensure sum stays positive
+                        if j == 0:
+                            # First number can be negative
+                            numbers[j] *= -1
+                        else:
+                            # For subsequent numbers, only make negative if it won't make sum negative
+                            current_sum = sum(numbers[:j])
+                            if current_sum + numbers[j] > 0:
+                                numbers[j] *= -1
+            
+            if persistNumberOfDigits:
+                sum_val = sum(numbers)
+                while len(str(abs(sum_val))) != numberOfDigitsLeft:
+                    numbers = []
+                    for j in range(numberOfRows):
+                        currentMin = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                        currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsRight - 1)
+                        numbers.append(generateRandomNumber(currentMin, currentMax))
+                    sum_val = sum(numbers)
+        
+        elif operation == 'multiplication':
+            if difficulty_level == 'easy':
+                # Easy: Use simple multiplication tables (1-12) or numbers ending in 0
+                if random.random() < 0.5:
+                    # Simple multiplication tables
+                    leftNum = random.randint(1, 12)
+                    rightNum = random.randint(1, 12)
+                else:
+                    # Numbers ending in 0
+                    leftMin = 10 ** (numberOfDigitsLeft - 1)
+                    leftMax = 10 ** numberOfDigitsLeft - 1
+                    rightMin = 10 ** (numberOfDigitsRight - 1)
+                    rightMax = 10 ** numberOfDigitsRight - 1
+                    leftNum = generateRandomNumber(leftMin, leftMax)
+                    rightNum = generateRandomNumber(rightMin, rightMax)
+                    leftNum = (leftNum // 10) * 10
+                    rightNum = (rightNum // 10) * 10
+                numbers = [leftNum, rightNum]
+            else:
+                # Medium/Hard: Regular multiplication
+                leftMin = 10 ** (numberOfDigitsLeft - 1)
+                leftMax = 10 ** numberOfDigitsLeft - 1
+                rightMin = 10 ** (numberOfDigitsRight - 1)
+                rightMax = 10 ** numberOfDigitsRight - 1
+                
+                leftNum = generateRandomNumber(leftMin, leftMax)
+                rightNum = generateRandomNumber(rightMin, rightMax)
+                numbers = [leftNum, rightNum]
+        
+        elif operation == 'division':
+            if difficulty_level == 'easy':
+                # Easy: Use simple division with clean results
+                divisor = random.randint(2, 12)
+                quotient = random.randint(1, 20)
+                dividend = divisor * quotient
+                numbers = [dividend, divisor]
+            else:
+                # Medium/Hard: Regular division
+                divisorMin = 10 ** (numberOfDigitsRight - 1)
+                divisorMax = 10 ** numberOfDigitsRight - 1
+                quotientMin = 10 ** (numberOfDigitsLeft - 1)
+                quotientMax = 10 ** numberOfDigitsLeft - 1
+                
+                divisor = generateRandomNumber(divisorMin, divisorMax)
+                quotient = generateRandomNumber(quotientMin, quotientMax)
+                dividend = divisor * quotient
+                numbers = [dividend, divisor]
+        
+        # Create question object
+        question = {
+            'questionId': i + 1,
+            'numbers': numbers,
+            'operation': operation,
+            'correct_answer': 0,
+            'question_type': 'practice'
+        }
+        
+        # Calculate correct answer
+        if operation == 'addition':
+            question['correct_answer'] = sum(numbers)
+        elif operation == 'multiplication':
+            question['correct_answer'] = numbers[0] * numbers[1]
+        elif operation == 'division':
+            question['correct_answer'] = numbers[0] // numbers[1]
+            if includeDecimals:
+                question['correct_answer'] = round(numbers[0] / numbers[1], 2)
+        
+        questions.append(question)
+    
+    return questions
+
+def generatePVPQuestion(difficulty_level='medium', number_of_digits=3, operation='addition', game_mode='flashcards'):
+    """
+    Generate a math question based on difficulty level for PVP games.
+    Now uses the same logic as practice modes for consistency.
+    """
+    import random
+    import math
+    
+    # Map difficulty levels to practice mode parameters
     if difficulty_level == 'easy':
-        # Easy: Addition & Subtraction only, operands 2-5 digits
-        operand_range = random.randint(2, 5)
-        num_operands = random.randint(2, 4)
-        operations = ['+', '-']
-        
-        operands = []
-        for i in range(num_operands):
-            operands.append(generate_operand(operand_range))
-        
-        operator = random.choice(operations)
-        
-        # Calculate answer
-        if operator == '+':
-            answer = sum(operands)
-        else:  # subtraction
-            # Ensure positive result
-            answer = operands[0]
-            for i in range(1, len(operands)):
-                answer -= operands[i]
-            if answer <= 0:
-                # Regenerate to ensure positive result
-                operands[0] = sum(operands[1:]) + random.randint(1, 100)
-                answer = operands[0] - sum(operands[1:])
-        
-        return {
-            'operands': operands,
-            'operator': operator,
-            'correct_answer': answer,
-            'question_type': 'basic'
-        }
-    
+        numberOfDigitsLeft = min(number_of_digits, 2)
+        numberOfDigitsRight = 1
+        numberOfRows = 2
+        zigZag = False
+        includeSubtraction = True
+        persistNumberOfDigits = False
+        includeDecimals = False
     elif difficulty_level == 'medium':
-        # Medium: Add, Sub, Multiply, operands 2-5 digits
-        operand_range = random.randint(2, 5)
-        num_operands = random.randint(2, 3)
-        operations = ['+', '-', '*']
-        
-        operands = []
-        for i in range(num_operands):
-            operands.append(generate_operand(operand_range))
-        
-        operator = random.choice(operations)
-        
-        # Calculate answer
-        if operator == '+':
-            answer = sum(operands)
-        elif operator == '-':
-            answer = operands[0] - sum(operands[1:])
-            if answer <= 0:
-                operands[0] = sum(operands[1:]) + random.randint(1, 100)
-                answer = operands[0] - sum(operands[1:])
-        else:  # multiplication
-            answer = 1
-            for op in operands:
-                answer *= op
-        
-        return {
-            'operands': operands,
-            'operator': operator,
-            'correct_answer': answer,
-            'question_type': 'basic'
-        }
-    
+        numberOfDigitsLeft = min(number_of_digits, 3)
+        numberOfDigitsRight = min(number_of_digits, 2)
+        numberOfRows = 2
+        zigZag = False
+        includeSubtraction = True
+        persistNumberOfDigits = False
+        includeDecimals = False
     elif difficulty_level == 'hard':
-        # Hard: Add, Sub, Multiply, Divide, operands 5-10 digits
-        operand_range = random.randint(5, 10)
-        num_operands = random.randint(2, 3)
-        operations = ['+', '-', '*', '/']
-        
-        operands = []
-        for i in range(num_operands):
-            operands.append(generate_operand(operand_range))
-        
-        operator = random.choice(operations)
-        
-        # Calculate answer
-        if operator == '+':
-            answer = sum(operands)
-        elif operator == '-':
-            answer = operands[0] - sum(operands[1:])
-            if answer <= 0:
-                operands[0] = sum(operands[1:]) + random.randint(1, 1000)
-                answer = operands[0] - sum(operands[1:])
-        elif operator == '*':
-            answer = 1
-            for op in operands:
-                answer *= op
-        else:  # division
-            # Ensure clean division
-            dividend = operands[0]
-            divisor = operands[1]
-            if dividend % divisor != 0:
-                # Make it divisible
-                dividend = divisor * random.randint(1, 100)
-                operands[0] = dividend
-            answer = dividend // divisor
-        
+        numberOfDigitsLeft = min(number_of_digits, 4)
+        numberOfDigitsRight = min(number_of_digits, 3)
+        numberOfRows = 3
+        zigZag = True
+        includeSubtraction = True
+        persistNumberOfDigits = True
+        includeDecimals = True
+    else:  # expert
+        numberOfDigitsLeft = min(number_of_digits, 5)
+        numberOfDigitsRight = min(number_of_digits, 4)
+        numberOfRows = 4
+        zigZag = True
+        includeSubtraction = True
+        persistNumberOfDigits = True
+        includeDecimals = True
+    
+    # Generate questions using the same logic as practice modes
+    questions = generatePracticeQuestions(
+        operation, numberOfDigitsLeft, numberOfDigitsRight, 1, numberOfRows,
+        zigZag, includeSubtraction, persistNumberOfDigits, includeDecimals
+    )
+    
+    if questions:
+        question = questions[0]
         return {
-            'operands': operands,
-            'operator': operator,
-            'correct_answer': answer,
-            'question_type': 'basic'
+            'operands': question['numbers'],
+            'operator': question['operation'],
+            'correct_answer': question['correct_answer'],
+            'question_type': question['question_type']
         }
     
-    else:  # expert
-        # Expert: All + Square, Root, Cube, single operand for special operations
-        question_types = ['basic', 'square', 'square_root', 'cube', 'cube_root']
-        question_type = random.choice(question_types)
-        
-        if question_type == 'basic':
-            # Basic operations with larger numbers
-            operand_range = random.randint(3, 8)
-            num_operands = random.randint(2, 3)
-            operations = ['+', '-', '*', '/']
-            
-            operands = []
-            for i in range(num_operands):
-                operands.append(generate_operand(operand_range))
-            
-            operator = random.choice(operations)
-            
-            # Calculate answer
-            if operator == '+':
-                answer = sum(operands)
-            elif operator == '-':
-                answer = operands[0] - sum(operands[1:])
-                if answer <= 0:
-                    operands[0] = sum(operands[1:]) + random.randint(1, 1000)
-                    answer = operands[0] - sum(operands[1:])
-            elif operator == '*':
-                answer = 1
-                for op in operands:
-                    answer *= op
-            else:  # division
-                dividend = operands[0]
-                divisor = operands[1]
-                if dividend % divisor != 0:
-                    dividend = divisor * random.randint(1, 100)
-                    operands[0] = dividend
-                answer = dividend // divisor
-            
-            return {
-                'operands': operands,
-                'operator': operator,
-                'correct_answer': answer,
-                'question_type': 'basic'
-            }
-        
-        else:
-            # Special operations - single operand
-            operand = generate_operand(number_of_digits)
-            
-            if question_type == 'square':
-                answer = operand ** 2
-                return {
-                    'operands': [operand],
-                    'operator': '²',
-                    'correct_answer': answer,
-                    'question_type': 'square'
-                }
-            elif question_type == 'square_root':
-                # Ensure perfect square
-                operand = random.randint(1, 20) ** 2
-                answer = int(math.sqrt(operand))
-                return {
-                    'operands': [operand],
-                    'operator': '√',
-                    'correct_answer': answer,
-                    'question_type': 'square_root'
-                }
-            elif question_type == 'cube':
-                answer = operand ** 3
-                return {
-                    'operands': [operand],
-                    'operator': '³',
-                    'correct_answer': answer,
-                    'question_type': 'cube'
-                }
-            else:  # cube_root
-                # Ensure perfect cube
-                operand = random.randint(1, 10) ** 3
-                answer = int(round(operand ** (1/3)))
-                return {
-                    'operands': [operand],
-                    'operator': '∛',
-                    'correct_answer': answer,
-                    'question_type': 'cube_root'
-                }
+    # Fallback to simple addition if generation fails
+    return {
+        'operands': [1, 2],
+        'operator': '+',
+        'correct_answer': 3,
+        'question_type': 'basic'
+    }
 
 
 # -------------------- Admin Related APIs ----------------------
@@ -2929,7 +2927,9 @@ class CreatePVPRoom(APIView):
                 time_per_question=request.data.get('time_per_question', 30),
                 level_id=request.data.get('level_id', 1),
                 class_id=request.data.get('class_id', 1),
-                topic_id=request.data.get('topic_id', 1)
+                topic_id=request.data.get('topic_id', 1),
+                game_mode=request.data.get('game_mode', 'flashcards'),
+                operation=request.data.get('operation', 'addition')
             )
             
             # Add creator as first player
@@ -3318,7 +3318,9 @@ class GetPVPGameQuestions(APIView):
                 'data': {
                     'questions': game_session.questions_data,
                     'total_questions': room.number_of_questions,
-                    'time_per_question': room.time_per_question
+                    'time_per_question': room.time_per_question,
+                    'game_mode': getattr(room, 'game_mode', 'flashcards'),
+                    'operation': getattr(room, 'operation', 'addition')
                 }
             }, status=status.HTTP_200_OK)
             
@@ -3793,6 +3795,8 @@ class CreatePVPRoom(APIView):
                 time_per_question=request.data.get('time_per_question', 30),
                 difficulty_level=request.data.get('difficulty_level', 'medium'),
                 number_of_digits=request.data.get('number_of_digits', 3),
+                game_mode=request.data.get('game_mode', 'flashcards'),
+                operation=request.data.get('operation', 'addition'),
                 status='waiting'
             )
             
@@ -4066,31 +4070,62 @@ class StartPVPGame(APIView):
             
             # Generate questions for the game
             questions = []
-            print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}, digits: {room.number_of_digits}")
-            for i in range(room.number_of_questions):
+            # Get game mode and operation from room settings
+            game_mode = getattr(room, 'game_mode', 'flashcards')
+            operation = getattr(room, 'operation', 'addition')
+            
+            # Set time per question based on game mode
+            if game_mode == 'flashcards':
+                # Flash cards use the time_per_question as is (5-20 seconds)
+                pass
+            elif game_mode == 'norush':
+                # No rush uses longer times (2-10 minutes)
+                pass
+            elif game_mode == 'timeattack':
+                # Time attack uses shorter times (10-30 seconds)
+                pass
+            elif game_mode == 'custom':
+                # Custom uses the selected time per question
+                pass
+            
+            print(f"Debug: Room data - operation: {operation}, game_mode: {game_mode}")
+            print(f"Debug: Room object - operation: {getattr(room, 'operation', 'NOT_SET')}, game_mode: {getattr(room, 'game_mode', 'NOT_SET')}")
+            print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}, digits: {room.number_of_digits}, operation: {operation}, game_mode: {game_mode}, time_per_question: {room.time_per_question}")
+            
+            # Generate questions using the same logic as practice modes
+            practice_questions = generatePracticeQuestions(
+                operation=operation,
+                numberOfDigitsLeft=room.number_of_digits,
+                numberOfDigitsRight=min(room.number_of_digits, 3),
+                numberOfQuestions=room.number_of_questions,
+                numberOfRows=2 if room.difficulty_level in ['easy', 'medium'] else 3,
+                zigZag=room.difficulty_level in ['hard', 'expert'],
+                includeSubtraction=True,
+                persistNumberOfDigits=room.difficulty_level in ['hard', 'expert'],
+                includeDecimals=room.difficulty_level in ['hard', 'expert'],
+                difficulty_level=room.difficulty_level
+            )
+            
+            # Convert practice questions to PvP format
+            for i, practice_question in enumerate(practice_questions):
                 try:
-                    question_data = generatePVPQuestion(room.difficulty_level, room.number_of_digits)
-                    print(f"Debug: Question {i+1} data: {question_data}")
-                    
-                    # Validate question data
-                    if not question_data or 'operands' not in question_data or 'correct_answer' not in question_data:
-                        print(f"Debug: Invalid question data for question {i+1}, skipping...")
-                        continue
-                    
-                    # Ensure answer is a valid number
-                    if not isinstance(question_data['correct_answer'], (int, float)) or question_data['correct_answer'] <= 0:
-                        print(f"Debug: Invalid answer for question {i+1}: {question_data['correct_answer']}, skipping...")
-                        continue
+                    # Map operation names to operator symbols
+                    operator_map = {
+                        'addition': '+',
+                        'multiplication': '×',
+                        'division': '÷'
+                    }
                     
                     questions.append({
                         'question_id': i + 1,
-                        'operands': question_data['operands'],
-                        'operator': question_data['operator'],
-                        'correct_answer': question_data['correct_answer'],
-                        'question_type': question_data['question_type']
+                        'operands': practice_question['numbers'],
+                        'operator': operator_map.get(practice_question['operation'], practice_question['operation']),
+                        'correct_answer': practice_question['correct_answer'],
+                        'question_type': practice_question['question_type']
                     })
+                    print(f"Debug: Question {i+1} data: {questions[-1]}")
                 except Exception as e:
-                    print(f"Debug: Error generating question {i+1}: {e}")
+                    print(f"Debug: Error processing question {i+1}: {e}")
                     continue
             
             print(f"Debug: Generated {len(questions)} questions")
@@ -4119,7 +4154,9 @@ class StartPVPGame(APIView):
                     'room_status': room.status,
                     'questions': questions,
                     'total_questions': room.number_of_questions,
-                    'time_per_question': room.time_per_question
+                    'time_per_question': room.time_per_question,
+                    'game_mode': game_mode,
+                    'operation': operation
                 }
             }, status=status.HTTP_200_OK)
             
