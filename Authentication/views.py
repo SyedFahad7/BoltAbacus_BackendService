@@ -674,116 +674,99 @@ def generatePracticeQuestions(operation, numberOfDigitsLeft, numberOfDigitsRight
     This ensures consistency between practice and PvP modes.
     """
     import random
-    import math
-    
+
     questions = []
-    
+
     for i in range(numberOfQuestions):
         numbers = []
-        
+
         if operation == 'addition':
-            for j in range(numberOfRows):
+            for _ in range(numberOfRows):
                 if difficulty_level == 'easy':
-                    # Easy: Use even numbers, numbers ending in 0, or simple patterns
+                    # Easy: even numbers or numbers ending with 0
                     if random.random() < 0.5:
-                        # Even numbers
-                        currentMin = 2 if zigZag else 10 ** (numberOfDigitsLeft - 1)
-                        currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
-                        num = generateRandomNumber(currentMin, currentMax)
+                        current_min = 2 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                        current_max = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                        num = generateRandomNumber(current_min, current_max)
                         if num % 2 != 0:
                             num += 1
                         numbers.append(num)
                     else:
-                        # Numbers ending in 0
-                        currentMin = 10 if zigZag else 10 ** (numberOfDigitsLeft - 1)
-                        currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
-                        num = generateRandomNumber(currentMin, currentMax)
-                        num = (num // 10) * 10  # Make it end in 0
-                        numbers.append(num)
+                        current_min = 10 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                        current_max = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                        num = generateRandomNumber(current_min, current_max)
+                        numbers.append((num // 10) * 10)
                 elif difficulty_level == 'medium':
-                    # Medium: Mix of easy and harder numbers
-                    currentMin = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
-                    currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
-                    numbers.append(generateRandomNumber(currentMin, currentMax))
+                    current_min = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                    current_max = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                    numbers.append(generateRandomNumber(current_min, current_max))
                 else:  # hard
-                    # Hard: More complex numbers, larger ranges
-                    currentMin = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
-                    currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
-                    numbers.append(generateRandomNumber(currentMin, currentMax))
-            
+                    current_min = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                    current_max = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsLeft - 1)
+                    numbers.append(generateRandomNumber(current_min, current_max))
+
             if includeSubtraction:
-                # Ensure the cumulative sum is always positive at each step
+                # Ensure cumulative sum stays positive
                 for j in range(len(numbers)):
                     if random.random() < 0.5:
-                        # Make this number negative, but ensure sum stays positive
                         if j == 0:
-                            # First number can be negative
                             numbers[j] *= -1
                         else:
-                            # For subsequent numbers, only make negative if it won't make sum negative
                             current_sum = sum(numbers[:j])
                             if current_sum + numbers[j] > 0:
                                 numbers[j] *= -1
-            
+
             if persistNumberOfDigits:
                 sum_val = sum(numbers)
                 while len(str(abs(sum_val))) != numberOfDigitsLeft:
                     numbers = []
-                    for j in range(numberOfRows):
-                        currentMin = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
-                        currentMax = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsRight - 1)
-                        numbers.append(generateRandomNumber(currentMin, currentMax))
+                    for _ in range(numberOfRows):
+                        current_min = 1 if zigZag else 10 ** (numberOfDigitsLeft - 1)
+                        current_max = (10 ** generateRandomNumber(1, numberOfDigitsLeft) - 1) if zigZag else (10 ** numberOfDigitsRight - 1)
+                        numbers.append(generateRandomNumber(current_min, current_max))
                     sum_val = sum(numbers)
-        
+
         elif operation == 'multiplication':
             if difficulty_level == 'easy':
-                # Easy: Use simple multiplication tables (1-12) or numbers ending in 0
                 if random.random() < 0.5:
-                    # Simple multiplication tables
-                    leftNum = random.randint(1, 12)
-                    rightNum = random.randint(1, 12)
+                    left_num = random.randint(1, 12)
+                    right_num = random.randint(1, 12)
                 else:
-                    # Numbers ending in 0
-                    leftMin = 10 ** (numberOfDigitsLeft - 1)
-                    leftMax = 10 ** numberOfDigitsLeft - 1
-                    rightMin = 10 ** (numberOfDigitsRight - 1)
-                    rightMax = 10 ** numberOfDigitsRight - 1
-                    leftNum = generateRandomNumber(leftMin, leftMax)
-                    rightNum = generateRandomNumber(rightMin, rightMax)
-                    leftNum = (leftNum // 10) * 10
-                    rightNum = (rightNum // 10) * 10
-                numbers = [leftNum, rightNum]
+                    left_min = 10 ** (numberOfDigitsLeft - 1)
+                    left_max = 10 ** numberOfDigitsLeft - 1
+                    right_min = 10 ** (numberOfDigitsRight - 1)
+                    right_max = 10 ** numberOfDigitsRight - 1
+                    left_num = generateRandomNumber(left_min, left_max)
+                    right_num = generateRandomNumber(right_min, right_max)
+                    left_num = (left_num // 10) * 10
+                    right_num = (right_num // 10) * 10
+                numbers = [left_num, right_num]
             else:
-                # Medium/Hard: Regular multiplication
-                leftMin = 10 ** (numberOfDigitsLeft - 1)
-                leftMax = 10 ** numberOfDigitsLeft - 1
-                rightMin = 10 ** (numberOfDigitsRight - 1)
-                rightMax = 10 ** numberOfDigitsRight - 1
-                
-                leftNum = generateRandomNumber(leftMin, leftMax)
-                rightNum = generateRandomNumber(rightMin, rightMax)
-                numbers = [leftNum, rightNum]
-        
+                left_min = 10 ** (numberOfDigitsLeft - 1)
+                left_max = 10 ** numberOfDigitsLeft - 1
+                right_min = 10 ** (numberOfDigitsRight - 1)
+                right_max = 10 ** numberOfDigitsRight - 1
+                left_num = generateRandomNumber(left_min, left_max)
+                right_num = generateRandomNumber(right_min, right_max)
+                numbers = [left_num, right_num]
+
         elif operation == 'division':
             if difficulty_level == 'easy':
-                # Easy: Use simple division with clean results
                 divisor = random.randint(2, 12)
                 quotient = random.randint(1, 20)
                 dividend = divisor * quotient
                 numbers = [dividend, divisor]
             else:
-                # Medium/Hard: Regular division
-                divisorMin = 10 ** (numberOfDigitsRight - 1)
-                divisorMax = 10 ** numberOfDigitsRight - 1
-                quotientMin = 10 ** (numberOfDigitsLeft - 1)
-                quotientMax = 10 ** numberOfDigitsLeft - 1
-                
-                divisor = generateRandomNumber(divisorMin, divisorMax)
-                quotient = generateRandomNumber(quotientMin, quotientMax)
+                divisor_min = 10 ** (numberOfDigitsRight - 1)
+                divisor_max = 10 ** numberOfDigitsRight - 1
+                quotient_min = 10 ** (numberOfDigitsLeft - 1)
+                quotient_max = 10 ** numberOfDigitsLeft - 1
+                divisor = generateRandomNumber(divisor_min, divisor_max)
+                quotient = generateRandomNumber(quotient_min, quotient_max)
                 dividend = divisor * quotient
                 numbers = [dividend, divisor]
-        
-        # Create question object
+
+        # Create question object and compute answer
         question = {
             'questionId': i + 1,
             'numbers': numbers,
@@ -791,8 +774,7 @@ def generatePracticeQuestions(operation, numberOfDigitsLeft, numberOfDigitsRight
             'correct_answer': 0,
             'question_type': 'practice'
         }
-        
-        # Calculate correct answer
+
         if operation == 'addition':
             question['correct_answer'] = sum(numbers)
         elif operation == 'multiplication':
@@ -801,19 +783,15 @@ def generatePracticeQuestions(operation, numberOfDigitsLeft, numberOfDigitsRight
             question['correct_answer'] = numbers[0] // numbers[1]
             if includeDecimals:
                 question['correct_answer'] = round(numbers[0] / numbers[1], 2)
-        
+
         questions.append(question)
-    
+
     return questions
 
 def generatePVPQuestion(difficulty_level='medium', number_of_digits=3, operation='addition', game_mode='flashcards'):
     """
-    Generate a math question based on difficulty level for PVP games.
-    Now uses the same logic as practice modes for consistency.
+    Generate a single math question for PVP using practice-mode logic.
     """
-    import random
-    import math
-    
     # Map difficulty levels to practice mode parameters
     if difficulty_level == 'easy':
         numberOfDigitsLeft = min(number_of_digits, 2)
@@ -847,13 +825,19 @@ def generatePVPQuestion(difficulty_level='medium', number_of_digits=3, operation
         includeSubtraction = True
         persistNumberOfDigits = True
         includeDecimals = True
-    
-    # Generate questions using the same logic as practice modes
+
     questions = generatePracticeQuestions(
-        operation, numberOfDigitsLeft, numberOfDigitsRight, 1, numberOfRows,
-        zigZag, includeSubtraction, persistNumberOfDigits, includeDecimals
+        operation,
+        numberOfDigitsLeft,
+        numberOfDigitsRight,
+        1,
+        numberOfRows,
+        zigZag,
+        includeSubtraction,
+        persistNumberOfDigits,
+        includeDecimals,
     )
-    
+
     if questions:
         question = questions[0]
         return {
@@ -862,8 +846,8 @@ def generatePVPQuestion(difficulty_level='medium', number_of_digits=3, operation
             'correct_answer': question['correct_answer'],
             'question_type': question['question_type']
         }
-    
-    # Fallback to simple addition if generation fails
+
+    # Fallback when generation fails
     return {
         'operands': [1, 2],
         'operator': '+',
