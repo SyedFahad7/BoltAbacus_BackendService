@@ -2709,7 +2709,7 @@ class SubmitPracticeQuestions(APIView):
             persistNumberOfDigits = data[Constants.PERSIST_NUMBER_OF_DIGITS]
             score = data[Constants.SCORE]
             totalTime = data[Constants.TOTAL_TIME]
-            averageTime = data[Constants.AVERAGE_TIME]
+            averageTime = data[Constants.AVERAGE_TIME]  
             problemTimes = data.get('problemTimes', [])  # Get detailed problem times
             
             if user is None:
