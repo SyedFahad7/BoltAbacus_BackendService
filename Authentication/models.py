@@ -102,6 +102,7 @@ class PracticeQuestions(models.Model):
     score = models.IntegerField(default=0)
     totalTime = models.FloatField(default=0)
     averageTime = models.FloatField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 # PVP and Experience Models
@@ -175,6 +176,20 @@ class PVPRoom(models.Model):
     topic_id = models.IntegerField(default=1)
     game_mode = models.CharField(max_length=20, default='flashcards')  # flashcards, norush, timeattack, custom
     operation = models.CharField(max_length=20, default='addition')  # addition, multiplication, division
+    
+    # Practice mode settings
+    numberOfDigitsLeft = models.IntegerField(default=1)
+    numberOfDigitsRight = models.IntegerField(default=1)
+    isZigzag = models.BooleanField(default=False)
+    numberOfRows = models.IntegerField(default=2)
+    includeSubtraction = models.BooleanField(default=False)
+    persistNumberOfDigits = models.BooleanField(default=False)
+    includeDecimals = models.BooleanField(default=False)
+    audioMode = models.BooleanField(default=False)
+    audioPace = models.CharField(max_length=10, default='normal')
+    showQuestion = models.BooleanField(default=True)
+    flashcard_speed = models.IntegerField(default=2500)  # in milliseconds
+    
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)

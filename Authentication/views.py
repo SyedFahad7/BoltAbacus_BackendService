@@ -2024,19 +2024,41 @@ def getStudentProgress(userId):
                     if 'topics' in topics and topics['topics']:
                         topics['topics'] = sorted(topics['topics'], key=lambda x: x.get(Constants.TOPIC_ID, 0))
 
-        # Calculate practice stats
-        total_sessions = len(studentProgress)
-        total_correct = sum(progress.score for progress in studentProgress)  # score represents problems solved
-        total_questions = sum(progress.score for progress in studentProgress)  # same as total_correct for now
-        total_time = sum(progress.time for progress in studentProgress)  # time in seconds
+        # Calculate practice stats from PracticeQuestions model
+        practice_sessions = PracticeQuestions.objects.filter(user_id=userId)
+        total_practice_sessions = practice_sessions.count()
+        total_practice_correct = sum(session.score for session in practice_sessions)
+        total_practice_questions = sum(session.numberOfQuestions for session in practice_sessions)
+        total_practice_time = sum(session.totalTime for session in practice_sessions)  # time in seconds
+        
+        # Calculate recent sessions (last 7 days)
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        week_ago = timezone.now() - timedelta(days=7)
+        recent_sessions = practice_sessions.filter(created_at__gte=week_ago)
         
         practice_stats = {
-            "totalSessions": total_sessions,
-            "totalCorrectAnswers": total_correct,
-            "totalQuestions": total_questions,
-            "totalTimeSpent": total_time,
-            "averageAccuracy": (total_correct / total_questions * 100) if total_questions > 0 else 0,
-            "averageTimePerSession": (total_time / total_sessions) if total_sessions > 0 else 0
+            "totalSessions": total_practice_sessions,
+            "totalCorrectAnswers": total_practice_correct,
+            "totalQuestions": total_practice_questions,
+            "totalTimeSpent": total_practice_time,
+            "averageAccuracy": (total_practice_correct / total_practice_questions * 100) if total_practice_questions > 0 else 0,
+            "averageTimePerSession": (total_practice_time / total_practice_sessions) if total_practice_sessions > 0 else 0,
+            "recentSessions": recent_sessions.count(),
+            "totalProblemsSolved": total_practice_correct,
+            "totalPracticeTime": total_practice_time,
+            "practiceSessions": [
+                {
+                    "id": session.practiceQuestionId,
+                    "type": session.practiceType,
+                    "operation": session.operation,
+                    "score": session.score,
+                    "totalQuestions": session.numberOfQuestions,
+                    "totalTime": session.totalTime,
+                    "averageTime": session.averageTime,
+                    "created_at": session.created_at.isoformat() if session.created_at else None
+                } for session in practice_sessions.order_by('-practiceQuestionId')[:10]  # Last 10 sessions
+            ]
         }
         
         return Response({
@@ -3781,6 +3803,18 @@ class CreatePVPRoom(APIView):
                 number_of_digits=request.data.get('number_of_digits', 3),
                 game_mode=request.data.get('game_mode', 'flashcards'),
                 operation=request.data.get('operation', 'addition'),
+                # Practice mode settings
+                numberOfDigitsLeft=request.data.get('numberOfDigitsLeft', 1),
+                numberOfDigitsRight=request.data.get('numberOfDigitsRight', 1),
+                isZigzag=request.data.get('isZigzag', False),
+                numberOfRows=request.data.get('numberOfRows', 2),
+                includeSubtraction=request.data.get('includeSubtraction', False),
+                persistNumberOfDigits=request.data.get('persistNumberOfDigits', False),
+                includeDecimals=request.data.get('includeDecimals', False),
+                audioMode=request.data.get('audioMode', False),
+                audioPace=request.data.get('audioPace', 'normal'),
+                showQuestion=request.data.get('showQuestion', True),
+                flashcard_speed=request.data.get('flashcard_speed', 2500),
                 status='waiting'
             )
             
@@ -3930,6 +3964,20 @@ class GetPVPRoomDetails(APIView):
                 'time_per_question': room.time_per_question,
                 'difficulty_level': room.difficulty_level,
                 'status': room.status,
+                'operation': room.operation,
+                'game_mode': room.game_mode,
+                # Practice mode settings
+                'numberOfDigitsLeft': room.numberOfDigitsLeft,
+                'numberOfDigitsRight': room.numberOfDigitsRight,
+                'isZigzag': room.isZigzag,
+                'numberOfRows': room.numberOfRows,
+                'includeSubtraction': room.includeSubtraction,
+                'persistNumberOfDigits': room.persistNumberOfDigits,
+                'includeDecimals': room.includeDecimals,
+                'audioMode': room.audioMode,
+                'audioPace': room.audioPace,
+                'showQuestion': room.showQuestion,
+                'flashcard_speed': room.flashcard_speed,
                 'players': players_data,
                 'created_at': room.created_at
             }
@@ -4200,51 +4248,59 @@ class SubmitPVPGameResult(APIView):
             
             if finished_players.count() == all_players.count():
                 # All players finished, determine winner
-                # Check if it's a draw (all players have same score)
+                # Check if it's a draw (top players have same score)
                 scores = [p.score for p in finished_players]
+                max_score = max(scores)
+                top_scorers = [p for p in finished_players if p.score == max_score]
                 print(f"Debug: All scores: {scores}")
-                print(f"Debug: Unique scores: {set(scores)}")
-                print(f"Debug: Number of unique scores: {len(set(scores))}")
-                is_draw = len(set(scores)) == 1 and len(scores) > 1
+                print(f"Debug: Max score: {max_score}")
+                print(f"Debug: Top scorers count: {len(top_scorers)}")
+                is_draw = len(top_scorers) > 1  # Draw if multiple players have the highest score
                 print(f"Debug: Is draw: {is_draw}")
                 
                 if is_draw:
-                    # It's a draw - all players get 20 XP
+                    # It's a draw - top scorers get 20 XP, others get 10 XP
                     winner = None
-                    experience_awarded = 20
                     
-                    # Award 20 XP to all players in draw
+                    # Award XP based on performance
                     for player in all_players:
                         user_exp, created = UserExperience.objects.get_or_create(
                             user=player.player,
                             defaults={'experience_points': 0, 'level': 1}
                         )
                         old_xp = user_exp.experience_points
-                        user_exp.experience_points += 20
+                        
+                        # Top scorers get 20 XP, others get 10 XP
+                        xp_award = 20 if player.score == max_score else 10
+                        user_exp.experience_points += xp_award
+                        
                         # Level calculation: 0-90 = Level 1, 100+ = Level 2+
                         if user_exp.experience_points <= 90:
                             user_exp.level = 1
                         else:
                             user_exp.level = ((user_exp.experience_points - 90) // 100) + 2
                         user_exp.save()
-                        print(f"Debug: Draw player {player.player.firstName} - XP: {old_xp} -> {user_exp.experience_points}")
+                        print(f"Debug: Player {player.player.firstName} - Score: {player.score}, XP: {old_xp} -> {user_exp.experience_points} (+{xp_award})")
                     
                     # Create game result for draw
                     game_result = PVPGameResult.objects.create(
                         room=room,
                         winner=None,  # No winner in draw
-                        winner_score=scores[0],  # All have same score
-                        winner_correct_answers=finished_players.first().correct_answers,
-                        winner_time=finished_players.first().total_time,
+                        winner_score=max_score,
+                        winner_correct_answers=top_scorers[0].correct_answers,
+                        winner_time=top_scorers[0].total_time,
                         experience_awarded=20
                     )
+                    
+                    # Determine current user's experience
+                    current_user_experience = 20 if user.score == max_score else 10
                     
                     result_data = {
                         'is_winner': None,  # No winner in draw
                         'is_draw': True,
                         'winner_name': None,
-                        'winner_score': scores[0],
-                        'experience_awarded': 20,
+                        'winner_score': max_score,
+                        'experience_awarded': current_user_experience,
                         'total_players': all_players.count()
                     }
                 else:
@@ -4746,29 +4802,56 @@ class GetAccuracyTrend(APIView):
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
-            # Get user's progress data for the last 7 days
+            # Get user's data for the last 7 days from all sources
             from datetime import datetime, timedelta
-            seven_days_ago = datetime.now() - timedelta(days=7)
+            from django.utils import timezone
+            seven_days_ago = timezone.now() - timedelta(days=7)
             
-            # Get progress records from the last 7 days
+            # Get classwork/homework progress from the last 7 days
             recent_progress = Progress.objects.filter(
                 user_id=user_id,
                 created_at__gte=seven_days_ago
             ).order_by('created_at')
             
-            # Calculate daily accuracy
+            # Get practice sessions from the last 7 days
+            recent_practice = PracticeQuestions.objects.filter(
+                user_id=user_id,
+                created_at__gte=seven_days_ago
+            ).order_by('created_at')
+            
+            # Get PvP sessions from the last 7 days
+            pvp_sessions = PVPGameResult.objects.filter(
+                player__player__userId=user_id,
+                created_at__gte=seven_days_ago
+            ).order_by('created_at')
+            
+            # Calculate daily accuracy - combining all data sources
             daily_accuracy = []
             current_date = seven_days_ago.date()
-            today = datetime.now().date()
+            today = timezone.now().date()
             
             while current_date <= today:
+                # Classwork/Homework data
                 day_progress = recent_progress.filter(created_at__date=current_date)
+                classwork_questions = sum(p.score for p in day_progress)  # score represents problems solved
+                classwork_correct = sum(p.score for p in day_progress)  # For classwork, score = correct answers
                 
-                if day_progress.exists():
-                    # Use percentage field from Progress model
-                    total_percentage = sum(p.percentage for p in day_progress)
-                    count = day_progress.count()
-                    accuracy = total_percentage / count if count > 0 else 0
+                # Practice mode data
+                day_practice = recent_practice.filter(created_at__date=current_date)
+                practice_questions = sum(session.numberOfQuestions for session in day_practice)
+                practice_correct = sum(session.score for session in day_practice)
+                
+                # PvP data
+                day_pvp = pvp_sessions.filter(created_at__date=current_date)
+                pvp_questions = sum(p.questionsAnswered for p in day_pvp)
+                pvp_correct = sum(p.correctAnswers for p in day_pvp)
+                
+                # Calculate total questions and correct answers for the day
+                total_questions = classwork_questions + practice_questions + pvp_questions
+                total_correct = classwork_correct + practice_correct + pvp_correct
+                
+                if total_questions > 0:
+                    accuracy = (total_correct / total_questions * 100)
                 else:
                     accuracy = 0
                 
@@ -4827,31 +4910,54 @@ class GetSpeedTrend(APIView):
             
             # Get user's progress data for the last 7 days
             from datetime import datetime, timedelta
-            seven_days_ago = datetime.now() - timedelta(days=7)
+            from django.utils import timezone
+            seven_days_ago = timezone.now() - timedelta(days=7)
             
-            # Get progress records from the last 7 days
+            # Get classwork/homework progress records from the last 7 days
             recent_progress = Progress.objects.filter(
                 user_id=user_id,
                 created_at__gte=seven_days_ago
             ).order_by('created_at')
             
-            # Calculate daily speed (problems per minute)
+            # Get practice mode sessions from the last 7 days
+            practice_sessions = PracticeQuestions.objects.filter(
+                user_id=user_id,
+                created_at__gte=seven_days_ago
+            ).order_by('created_at')
+            
+            # Get PvP sessions from the last 7 days
+            pvp_sessions = PVPGameResult.objects.filter(
+                player__player__userId=user_id,
+                created_at__gte=seven_days_ago
+            ).order_by('created_at')
+            
+            # Calculate daily speed (problems per minute) - combining all data sources
             daily_speed = []
             current_date = seven_days_ago.date()
-            today = datetime.now().date()
+            today = timezone.now().date()
             
             while current_date <= today:
+                # Classwork/Homework data
                 day_progress = recent_progress.filter(created_at__date=current_date)
+                classwork_problems = sum(p.score for p in day_progress)  # score represents problems solved
+                classwork_time_minutes = sum(p.time for p in day_progress) / 60  # time is in seconds
                 
-                if day_progress.exists():
-                    # Use score as number of problems solved and time field from Progress model
-                    total_problems = sum(p.score for p in day_progress)  # score represents problems solved
-                    total_time_minutes = sum(p.time for p in day_progress) / 60  # time is in seconds
-                    
-                    if total_time_minutes > 0:
-                        speed = total_problems / total_time_minutes
-                    else:
-                        speed = 0
+                # Practice mode data
+                day_practice = practice_sessions.filter(created_at__date=current_date)
+                practice_problems = sum(p.numberOfQuestions for p in day_practice)
+                practice_time_minutes = sum(p.totalTime for p in day_practice) / 60  # totalTime is in seconds
+                
+                # PvP data
+                day_pvp = pvp_sessions.filter(created_at__date=current_date)
+                pvp_problems = sum(p.questionsAnswered for p in day_pvp)
+                pvp_time_minutes = sum(p.totalTime for p in day_pvp) / 60  # totalTime is in seconds
+                
+                # Calculate total problems and time for the day
+                total_problems = classwork_problems + practice_problems + pvp_problems
+                total_time_minutes = classwork_time_minutes + practice_time_minutes + pvp_time_minutes
+                
+                if total_time_minutes > 0:
+                    speed = total_problems / total_time_minutes
                 else:
                     speed = 0
                 
