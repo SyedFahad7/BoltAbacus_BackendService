@@ -102,6 +102,7 @@ class PracticeQuestions(models.Model):
     score = models.IntegerField(default=0)
     totalTime = models.FloatField(default=0)
     averageTime = models.FloatField(default=0)
+    problemTimes = models.JSONField(default=list, blank=True)  # Store detailed problem times
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -214,6 +215,7 @@ class PVPRoomPlayer(models.Model):
     score = models.IntegerField(default=0)
     correct_answers = models.IntegerField(default=0)
     total_time = models.FloatField(default=0)
+    problem_times = models.JSONField(default=list, blank=True)  # Store detailed problem times
     joined_at = models.DateTimeField(auto_now_add=True)
     ready_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)

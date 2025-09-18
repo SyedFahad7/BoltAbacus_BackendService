@@ -2709,7 +2709,9 @@ class SubmitPracticeQuestions(APIView):
             persistNumberOfDigits = data[Constants.PERSIST_NUMBER_OF_DIGITS]
             score = data[Constants.SCORE]
             totalTime = data[Constants.TOTAL_TIME]
-            averageTime = data[Constants.AVERAGE_TIME]  
+            averageTime = data[Constants.AVERAGE_TIME]
+            problemTimes = data.get('problemTimes', [])  # Get detailed problem times
+            
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
             if not ifPracticeQuestionsAlreadyExists(data, userId):
@@ -2725,7 +2727,8 @@ class SubmitPracticeQuestions(APIView):
                     persistNumberOfDigits = persistNumberOfDigits,
                     score = score,
                     totalTime = totalTime,
-                    averageTime = averageTime
+                    averageTime = averageTime,
+                    problemTimes = problemTimes
                 )
                 return Response({Constants.JSON_MESSAGE: "Practice Attempt stored Successfully"}, status=status.HTTP_200_OK)
             return Response({Constants.JSON_MESSAGE: "Practice Attempt already stored"}, status=status.HTTP_409_CONFLICT)
@@ -4217,6 +4220,7 @@ class SubmitPVPGameResult(APIView):
             score = request.data.get('score', 0)
             correct_answers = request.data.get('correct_answers', 0)
             total_time = request.data.get('total_time', 0)
+            problem_times = request.data.get('problemTimes', [])
             
             if not room_id:
                 return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -4234,6 +4238,7 @@ class SubmitPVPGameResult(APIView):
             player.score = score
             player.correct_answers = correct_answers
             player.total_time = total_time
+            player.problem_times = problem_times
             player.status = 'finished'  # Mark player as finished
             player.finished_at = timezone.now()
             player.save()
@@ -4841,14 +4846,44 @@ class GetAccuracyTrend(APIView):
                 practice_questions = sum(session.numberOfQuestions for session in day_practice)
                 practice_correct = sum(session.score for session in day_practice)
                 
+                # Calculate accuracy from detailed problem times if available
+                practice_accuracy_questions = 0
+                practice_accuracy_correct = 0
+                for session in day_practice:
+                    if session.problemTimes and len(session.problemTimes) > 0:
+                        # Use detailed problem times for more accurate accuracy calculation
+                        for problem_time in session.problemTimes:
+                            practice_accuracy_questions += 1
+                            if problem_time.get('isCorrect', False):
+                                practice_accuracy_correct += 1
+                    else:
+                        # Fallback to session-level data
+                        practice_accuracy_questions += session.numberOfQuestions
+                        practice_accuracy_correct += session.score
+                
                 # PvP data
                 day_pvp = pvp_sessions.filter(created_at__date=current_date)
                 pvp_questions = sum(p.questionsAnswered for p in day_pvp)
                 pvp_correct = sum(p.correctAnswers for p in day_pvp)
                 
-                # Calculate total questions and correct answers for the day
-                total_questions = classwork_questions + practice_questions + pvp_questions
-                total_correct = classwork_correct + practice_correct + pvp_correct
+                # Calculate accuracy from detailed PvP problem times if available
+                pvp_accuracy_questions = 0
+                pvp_accuracy_correct = 0
+                for session in day_pvp:
+                    if hasattr(session, 'problem_times') and session.problem_times and len(session.problem_times) > 0:
+                        # Use detailed problem times for more accurate accuracy calculation
+                        for problem_time in session.problem_times:
+                            pvp_accuracy_questions += 1
+                            if problem_time.get('isCorrect', False):
+                                pvp_accuracy_correct += 1
+                    else:
+                        # Fallback to session-level data
+                        pvp_accuracy_questions += session.questionsAnswered
+                        pvp_accuracy_correct += session.correctAnswers
+                
+                # Calculate total questions and correct answers for the day using detailed data
+                total_questions = classwork_questions + practice_accuracy_questions + pvp_accuracy_questions
+                total_correct = classwork_correct + practice_accuracy_correct + pvp_accuracy_correct
                 
                 if total_questions > 0:
                     accuracy = (total_correct / total_questions * 100)
@@ -4947,14 +4982,44 @@ class GetSpeedTrend(APIView):
                 practice_problems = sum(p.numberOfQuestions for p in day_practice)
                 practice_time_minutes = sum(p.totalTime for p in day_practice) / 60  # totalTime is in seconds
                 
+                # Calculate speed from detailed problem times if available
+                practice_speed_problems = 0
+                practice_speed_time = 0
+                for session in day_practice:
+                    if session.problemTimes and len(session.problemTimes) > 0:
+                        # Use detailed problem times for more accurate speed calculation
+                        for problem_time in session.problemTimes:
+                            if not problem_time.get('isSkipped', False):  # Don't count skipped problems
+                                practice_speed_problems += 1
+                                practice_speed_time += problem_time.get('timeSpent', 0) / 60  # Convert to minutes
+                    else:
+                        # Fallback to session-level data
+                        practice_speed_problems += session.numberOfQuestions
+                        practice_speed_time += session.totalTime / 60
+                
                 # PvP data
                 day_pvp = pvp_sessions.filter(created_at__date=current_date)
                 pvp_problems = sum(p.questionsAnswered for p in day_pvp)
                 pvp_time_minutes = sum(p.totalTime for p in day_pvp) / 60  # totalTime is in seconds
                 
-                # Calculate total problems and time for the day
-                total_problems = classwork_problems + practice_problems + pvp_problems
-                total_time_minutes = classwork_time_minutes + practice_time_minutes + pvp_time_minutes
+                # Calculate speed from detailed PvP problem times if available
+                pvp_speed_problems = 0
+                pvp_speed_time = 0
+                for session in day_pvp:
+                    if hasattr(session, 'problem_times') and session.problem_times and len(session.problem_times) > 0:
+                        # Use detailed problem times for more accurate speed calculation
+                        for problem_time in session.problem_times:
+                            if not problem_time.get('isSkipped', False):  # Don't count skipped problems
+                                pvp_speed_problems += 1
+                                pvp_speed_time += problem_time.get('timeSpent', 0) / 60  # Convert to minutes
+                    else:
+                        # Fallback to session-level data
+                        pvp_speed_problems += session.questionsAnswered
+                        pvp_speed_time += session.totalTime / 60
+                
+                # Calculate total problems and time for the day using detailed data
+                total_problems = classwork_problems + practice_speed_problems + pvp_speed_problems
+                total_time_minutes = classwork_time_minutes + practice_speed_time + pvp_speed_time
                 
                 if total_time_minutes > 0:
                     speed = total_problems / total_time_minutes
