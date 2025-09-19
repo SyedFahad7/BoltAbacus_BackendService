@@ -2024,14 +2024,57 @@ def getStudentProgress(userId):
                     if 'topics' in topics and topics['topics']:
                         topics['topics'] = sorted(topics['topics'], key=lambda x: x.get(Constants.TOPIC_ID, 0))
 
-        # Calculate practice stats from PracticeQuestions model
+        # Calculate practice stats from PracticeQuestions model with detailed problem times
         practice_sessions = PracticeQuestions.objects.filter(user_id=userId)
         total_practice_sessions = practice_sessions.count()
-        total_practice_correct = sum(session.score for session in practice_sessions)
-        total_practice_questions = sum(session.numberOfQuestions for session in practice_sessions)
-        total_practice_time = sum(session.totalTime for session in practice_sessions)  # time in seconds
         
-        # Calculate recent sessions (last 7 days)
+        # Calculate detailed stats using problemTimes if available
+        total_practice_correct = 0
+        total_practice_questions = 0
+        total_practice_time = 0
+        detailed_sessions = []
+        
+        for session in practice_sessions:
+            if session.problemTimes and len(session.problemTimes) > 0:
+                # Use detailed problem times for accurate calculation
+                session_correct = sum(1 for pt in session.problemTimes if pt.get('isCorrect', False))
+                session_questions = len(session.problemTimes)
+                session_time = sum(pt.get('timeSpent', 0) for pt in session.problemTimes)
+                
+                total_practice_correct += session_correct
+                total_practice_questions += session_questions
+                total_practice_time += session_time
+                
+                detailed_sessions.append({
+                    "id": session.practiceQuestionId,
+                    "type": session.practiceType,
+                    "operation": session.operation,
+                    "score": session_correct,
+                    "totalQuestions": session_questions,
+                    "totalTime": session_time,
+                    "averageTime": session_time / session_questions if session_questions > 0 else 0,
+                    "problemTimes": session.problemTimes,
+                    "created_at": session.created_at.isoformat() if session.created_at else None
+                })
+            else:
+                # Fallback to session-level data
+                total_practice_correct += session.score
+                total_practice_questions += session.numberOfQuestions
+                total_practice_time += session.totalTime
+                
+                detailed_sessions.append({
+                    "id": session.practiceQuestionId,
+                    "type": session.practiceType,
+                    "operation": session.operation,
+                    "score": session.score,
+                    "totalQuestions": session.numberOfQuestions,
+                    "totalTime": session.totalTime,
+                    "averageTime": session.averageTime,
+                    "problemTimes": [],
+                    "created_at": session.created_at.isoformat() if session.created_at else None
+                })
+        
+        # Calculate recent practice sessions (last 7 days)
         from datetime import datetime, timedelta
         from django.utils import timezone
         week_ago = timezone.now() - timedelta(days=7)
@@ -2047,18 +2090,71 @@ def getStudentProgress(userId):
             "recentSessions": recent_sessions.count(),
             "totalProblemsSolved": total_practice_correct,
             "totalPracticeTime": total_practice_time,
-            "practiceSessions": [
-                {
-                    "id": session.practiceQuestionId,
-                    "type": session.practiceType,
-                    "operation": session.operation,
-                    "score": session.score,
-                    "totalQuestions": session.numberOfQuestions,
-                    "totalTime": session.totalTime,
-                    "averageTime": session.averageTime,
-                    "created_at": session.created_at.isoformat() if session.created_at else None
-                } for session in practice_sessions.order_by('-practiceQuestionId')[:10]  # Last 10 sessions
-            ]
+            "practiceSessions": detailed_sessions[:10]  # Last 10 sessions with detailed data
+        }
+        
+        # Calculate PvP stats from PVPRoomPlayer model
+        pvp_sessions = PVPRoomPlayer.objects.filter(player=user, status='finished')
+        total_pvp_sessions = pvp_sessions.count()
+        
+        # Calculate detailed PvP stats using problem_times if available
+        total_pvp_correct = 0
+        total_pvp_questions = 0
+        total_pvp_time = 0
+        detailed_pvp_sessions = []
+        
+        for session in pvp_sessions:
+            if session.problem_times and len(session.problem_times) > 0:
+                # Use detailed problem times for accurate calculation
+                session_correct = sum(1 for pt in session.problem_times if pt.get('isCorrect', False))
+                session_questions = len(session.problem_times)
+                session_time = sum(pt.get('timeSpent', 0) for pt in session.problem_times)
+                
+                total_pvp_correct += session_correct
+                total_pvp_questions += session_questions
+                total_pvp_time += session_time
+                
+                detailed_pvp_sessions.append({
+                    "id": session.id,
+                    "room_id": session.room.room_id,
+                    "score": session_correct,
+                    "totalQuestions": session_questions,
+                    "totalTime": session_time,
+                    "averageTime": session_time / session_questions if session_questions > 0 else 0,
+                    "problemTimes": session.problem_times,
+                    "finished_at": session.finished_at.isoformat() if session.finished_at else None
+                })
+            else:
+                # Fallback to session-level data
+                total_pvp_correct += session.correct_answers
+                total_pvp_questions += session.room.number_of_questions
+                total_pvp_time += session.total_time
+                
+                detailed_pvp_sessions.append({
+                    "id": session.id,
+                    "room_id": session.room.room_id,
+                    "score": session.correct_answers,
+                    "totalQuestions": session.room.number_of_questions,
+                    "totalTime": session.total_time,
+                    "averageTime": session.total_time / session.room.number_of_questions if session.room.number_of_questions > 0 else 0,
+                    "problemTimes": [],
+                    "finished_at": session.finished_at.isoformat() if session.finished_at else None
+                })
+        
+        # Calculate recent PvP sessions (last 7 days)
+        recent_pvp_sessions = pvp_sessions.filter(finished_at__gte=week_ago)
+        
+        pvp_stats = {
+            "totalSessions": total_pvp_sessions,
+            "totalCorrectAnswers": total_pvp_correct,
+            "totalQuestions": total_pvp_questions,
+            "totalTimeSpent": total_pvp_time,
+            "averageAccuracy": (total_pvp_correct / total_pvp_questions * 100) if total_pvp_questions > 0 else 0,
+            "averageTimePerSession": (total_pvp_time / total_pvp_sessions) if total_pvp_sessions > 0 else 0,
+            "recentSessions": recent_pvp_sessions.count(),
+            "totalProblemsSolved": total_pvp_correct,
+            "totalPvpTime": total_pvp_time,
+            "pvpSessions": detailed_pvp_sessions[:10]  # Last 10 sessions with detailed data
         }
         
         return Response({
@@ -2066,7 +2162,8 @@ def getStudentProgress(userId):
             Constants.LAST_NAME: user.lastName,
             Constants.BATCH_NAME: batch.batchName,
             "levels": levelsProgressData,
-            "practiceStats": practice_stats
+            "practiceStats": practice_stats,
+            "pvpStats": pvp_stats
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
