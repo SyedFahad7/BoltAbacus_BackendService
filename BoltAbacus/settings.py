@@ -99,7 +99,10 @@ import dj_database_url
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', 'postgresql://postgres:12345678@boltabacusdb.cxoohqadjgtz.ap-south-1.rds.amazonaws.com:5432/boltabacusdb'),
+        default=os.environ.get(
+            'DATABASE_URL',
+            'postgresql://postgres:12345678@boltabacusdb-restore-sept19.cxoohqadjgtz.ap-south-1.rds.amazonaws.com:5432/boltabacusdb'
+        ),
         conn_max_age=600
     )
 }
