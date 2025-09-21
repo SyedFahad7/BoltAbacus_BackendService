@@ -97,15 +97,19 @@ WSGI_APPLICATION = 'BoltAbacus.wsgi.application'
 
 import dj_database_url
 
+import os
+import dj_database_url
+
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get(
             'DATABASE_URL',
-            'postgresql://postgres:12345678@boltabacusdb-restore-sept19.cxoohqadjgtz.ap-south-1.rds.amazonaws.com:5432/boltabacusdb'
+            'postgresql://postgres:12345678@boltabacusdbs.cxoohqadjgtz.ap-south-1.rds.amazonaws.com:5432/boltabacusdb'
         ),
         conn_max_age=600
     )
 }
+
 
 # AUTH_USER_MODEL = "Authentication.TopicDetails"
 
