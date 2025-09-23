@@ -3024,34 +3024,54 @@ class CreatePVPRoom(APIView):
             
             room_code = generate_room_code()
             
-            # Create room
+            # Create room with all practice mode settings
             room = PVPRoom.objects.create(
                 room_id=room_code,
                 creator=user,
                 max_players=request.data.get('max_players', 2),
                 number_of_questions=request.data.get('number_of_questions', 10),
                 time_per_question=request.data.get('time_per_question', 30),
+                difficulty_level=request.data.get('difficulty_level', 'medium'),
+                number_of_digits=request.data.get('number_of_digits', 3),
                 level_id=request.data.get('level_id', 1),
                 class_id=request.data.get('class_id', 1),
                 topic_id=request.data.get('topic_id', 1),
                 game_mode=request.data.get('game_mode', 'flashcards'),
-                operation=request.data.get('operation', 'addition')
+                operation=request.data.get('operation', 'addition'),
+                # Practice mode settings
+                numberOfDigitsLeft=request.data.get('numberOfDigitsLeft', 1),
+                numberOfDigitsRight=request.data.get('numberOfDigitsRight', 1),
+                isZigzag=request.data.get('isZigzag', False),
+                numberOfRows=request.data.get('numberOfRows', 2),
+                includeSubtraction=request.data.get('includeSubtraction', False),
+                persistNumberOfDigits=request.data.get('persistNumberOfDigits', False),
+                includeDecimals=request.data.get('includeDecimals', False),
+                audioMode=request.data.get('audioMode', False),
+                audioPace=request.data.get('audioPace', 'normal'),
+                showQuestion=request.data.get('showQuestion', True),
+                status='waiting'
             )
             
             # Add creator as first player
             PVPRoomPlayer.objects.create(
                 room=room,
                 player=user,
-                status='joined'
+                is_ready=True,
+                score=0,
+                correct_answers=0,
+                total_time=0
             )
             
+            # Update current players count
             room.current_players = 1
             room.save()
             
             return Response({
                 'success': True,
+                'data': {
                 'room_id': room.room_id,
                 'message': 'Room created successfully'
+                }
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -3696,9 +3716,54 @@ class AddPersonalGoal(APIView):
             # Get goal data from request
             goal_title = request.data.get('title', '').strip()
             goal_description = request.data.get('description', '').strip()
+            priority = request.data.get('priority', 'medium')
+            goal_type = request.data.get('goal_type', 'personal')
+            
+            # Scheduling fields
+            due_date = request.data.get('due_date')
+            scheduled_date = request.data.get('scheduled_date')
+            scheduled_time = request.data.get('scheduled_time')
+            frequency = request.data.get('frequency', 'once')
+            reminder_enabled = request.data.get('reminder_enabled', False)
+            reminder_time = request.data.get('reminder_time')
             
             if not goal_title:
                 return Response({Constants.JSON_MESSAGE: "Goal title is required"}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Parse datetime fields if provided
+            from datetime import datetime, date, time
+            parsed_due_date = None
+            parsed_scheduled_date = None
+            parsed_scheduled_time = None
+            parsed_reminder_time = None
+            
+            if due_date:
+                try:
+                    parsed_due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+                except ValueError:
+                    return Response({Constants.JSON_MESSAGE: "Invalid due_date format. Use ISO format."}, 
+                                  status=status.HTTP_400_BAD_REQUEST)
+            
+            if scheduled_date:
+                try:
+                    parsed_scheduled_date = datetime.strptime(scheduled_date, '%Y-%m-%d').date()
+                except ValueError:
+                    return Response({Constants.JSON_MESSAGE: "Invalid scheduled_date format. Use YYYY-MM-DD."}, 
+                                  status=status.HTTP_400_BAD_REQUEST)
+            
+            if scheduled_time:
+                try:
+                    parsed_scheduled_time = datetime.strptime(scheduled_time, '%H:%M').time()
+                except ValueError:
+                    return Response({Constants.JSON_MESSAGE: "Invalid scheduled_time format. Use HH:MM."}, 
+                                  status=status.HTTP_400_BAD_REQUEST)
+            
+            if reminder_time:
+                try:
+                    parsed_reminder_time = datetime.strptime(reminder_time, '%H:%M').time()
+                except ValueError:
+                    return Response({Constants.JSON_MESSAGE: "Invalid reminder_time format. Use HH:MM."}, 
                               status=status.HTTP_400_BAD_REQUEST)
             
             # Create personal goal using PersonalGoal model
@@ -3708,8 +3773,14 @@ class AddPersonalGoal(APIView):
                 user=user,
                 title=goal_title,
                 description=goal_description,
-                priority='medium',
-                goal_type='personal'
+                priority=priority,
+                goal_type=goal_type,
+                due_date=parsed_due_date,
+                scheduled_date=parsed_scheduled_date,
+                scheduled_time=parsed_scheduled_time,
+                frequency=frequency,
+                reminder_enabled=reminder_enabled,
+                reminder_time=parsed_reminder_time
             )
             
             return Response({
@@ -3721,7 +3792,18 @@ class AddPersonalGoal(APIView):
                     'description': personal_goal.description,
                     'completed': personal_goal.completed,
                     'priority': personal_goal.priority,
-                    'type': personal_goal.goal_type
+                    'type': personal_goal.goal_type,
+                    'due_date': personal_goal.due_date.isoformat() if personal_goal.due_date else None,
+                    'scheduled_date': personal_goal.scheduled_date.isoformat() if personal_goal.scheduled_date else None,
+                    'scheduled_time': personal_goal.scheduled_time.isoformat() if personal_goal.scheduled_time else None,
+                    'frequency': personal_goal.frequency,
+                    'reminder_enabled': personal_goal.reminder_enabled,
+                    'reminder_time': personal_goal.reminder_time.isoformat() if personal_goal.reminder_time else None,
+                    'is_overdue': personal_goal.is_overdue,
+                    'is_due_today': personal_goal.is_due_today,
+                    'days_until_due': personal_goal.days_until_due,
+                    'created_at': personal_goal.created_at.isoformat(),
+                    'updated_at': personal_goal.updated_at.isoformat()
                 }
             }, status=status.HTTP_200_OK)
             
@@ -3861,88 +3943,6 @@ class GetPVPGameResult(APIView):
                 'success': True,
                 'data': result_data
             }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class CreatePVPRoom(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        try:
-            requestUserToken = request.headers[Constants.TOKEN_HEADER]
-            try:
-                userId = IdExtraction(requestUserToken)
-                if isinstance(userId, Exception):
-                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
-            except Exception as e:
-                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
-            
-            user = UserDetails.objects.filter(userId=userId).first()
-            if user is None:
-                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
-            
-            # Generate unique room code
-            import random
-            import string
-            room_code = ''.join(random.choices(string.digits, k=6))
-            
-            # Ensure room code is unique
-            while PVPRoom.objects.filter(room_id=room_code).exists():
-                room_code = ''.join(random.choices(string.digits, k=6))
-            
-            # Create room
-            room = PVPRoom.objects.create(
-                room_id=room_code,
-                creator=user,
-                max_players=request.data.get('max_players', 2),
-                number_of_questions=request.data.get('number_of_questions', 10),
-                time_per_question=request.data.get('time_per_question', 30),
-                difficulty_level=request.data.get('difficulty_level', 'medium'),
-                number_of_digits=request.data.get('number_of_digits', 3),
-                game_mode=request.data.get('game_mode', 'flashcards'),
-                operation=request.data.get('operation', 'addition'),
-                # Practice mode settings
-                numberOfDigitsLeft=request.data.get('numberOfDigitsLeft', 1),
-                numberOfDigitsRight=request.data.get('numberOfDigitsRight', 1),
-                isZigzag=request.data.get('isZigzag', False),
-                numberOfRows=request.data.get('numberOfRows', 2),
-                includeSubtraction=request.data.get('includeSubtraction', False),
-                persistNumberOfDigits=request.data.get('persistNumberOfDigits', False),
-                includeDecimals=request.data.get('includeDecimals', False),
-                audioMode=request.data.get('audioMode', False),
-                audioPace=request.data.get('audioPace', 'normal'),
-                showQuestion=request.data.get('showQuestion', True),
-                flashcard_speed=request.data.get('flashcard_speed', 2500),
-                status='waiting'
-            )
-            
-            # Add creator as first player
-            PVPRoomPlayer.objects.create(
-                room=room,
-                player=user,
-                is_ready=True,
-                score=0,
-                correct_answers=0,
-                total_time=0
-            )
-            
-            # Update current players count
-            room.current_players = 1
-            room.save()
-            
-            return Response({
-                'success': True,
-                'data': {
-                    'room_id': room.room_id,
-                    'creator_id': user.userId,
-                    'max_players': room.max_players,
-                    'number_of_questions': room.number_of_questions,
-                    'time_per_question': room.time_per_question,
-                    'status': room.status
-                }
-            }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -4224,17 +4224,17 @@ class StartPVPGame(APIView):
             print(f"Debug: Room object - operation: {getattr(room, 'operation', 'NOT_SET')}, game_mode: {getattr(room, 'game_mode', 'NOT_SET')}")
             print(f"Debug: Generating {room.number_of_questions} questions for difficulty: {room.difficulty_level}, digits: {room.number_of_digits}, operation: {operation}, game_mode: {game_mode}, time_per_question: {room.time_per_question}")
             
-            # Generate questions using the same logic as practice modes
+            # Generate questions using the room's practice mode settings
             practice_questions = generatePracticeQuestions(
                 operation=operation,
-                numberOfDigitsLeft=room.number_of_digits,
-                numberOfDigitsRight=min(room.number_of_digits, 3),
+                numberOfDigitsLeft=getattr(room, 'numberOfDigitsLeft', room.number_of_digits),
+                numberOfDigitsRight=getattr(room, 'numberOfDigitsRight', min(room.number_of_digits, 3)),
                 numberOfQuestions=room.number_of_questions,
-                numberOfRows=2 if room.difficulty_level in ['easy', 'medium'] else 3,
-                zigZag=room.difficulty_level in ['hard', 'expert'],
-                includeSubtraction=True,
-                persistNumberOfDigits=room.difficulty_level in ['hard', 'expert'],
-                includeDecimals=room.difficulty_level in ['hard', 'expert'],
+                numberOfRows=getattr(room, 'numberOfRows', 2),
+                zigZag=getattr(room, 'isZigzag', False),
+                includeSubtraction=getattr(room, 'includeSubtraction', False),
+                persistNumberOfDigits=getattr(room, 'persistNumberOfDigits', False),
+                includeDecimals=getattr(room, 'includeDecimals', False),
                 difficulty_level=room.difficulty_level
             )
             
@@ -4797,7 +4797,24 @@ class UpdateUserStreak(APIView):
             
             # Update streak with proper error handling
             try:
-                new_streak = user_streak.update_streak()
+                # Check if streak should be reset due to inactivity
+                from datetime import date, timedelta
+                today = date.today()
+                
+                if user_streak.last_activity_date:
+                    days_since_activity = (today - user_streak.last_activity_date).days
+                    if days_since_activity > 1:
+                        # User has been inactive for more than 1 day, reset streak
+                        user_streak.reset_streak()
+                        new_streak = 1  # Start new streak
+                        user_streak.update_streak(today)
+                    else:
+                        # Normal streak update
+                        new_streak = user_streak.update_streak(today)
+                else:
+                    # First time activity
+                    new_streak = user_streak.update_streak(today)
+                
             except Exception as e:
                 return Response({Constants.JSON_MESSAGE: f"Error updating streak: {str(e)}"}, 
                               status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -133,17 +133,57 @@ class PersonalGoal(models.Model):
         ('pvp', 'PVP'),
     ]
     
+    FREQUENCY_CHOICES = [
+        ('once', 'Once'),
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+    ]
+    
     user = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE, related_name='personal_goals')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     completed = models.BooleanField(default=False)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
     goal_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='personal')
+    
+    # Scheduling fields
+    due_date = models.DateTimeField(null=True, blank=True, help_text="When this goal should be completed")
+    scheduled_date = models.DateField(null=True, blank=True, help_text="When this goal is scheduled to be worked on")
+    scheduled_time = models.TimeField(null=True, blank=True, help_text="Specific time for the goal")
+    frequency = models.CharField(max_length=10, choices=FREQUENCY_CHOICES, default='once', help_text="How often this goal repeats")
+    reminder_enabled = models.BooleanField(default=False, help_text="Whether to send reminders for this goal")
+    reminder_time = models.TimeField(null=True, blank=True, help_text="Time to send reminder")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.firstName} {self.user.lastName} - {self.title}"
+    
+    @property
+    def is_overdue(self):
+        """Check if the goal is overdue"""
+        if not self.due_date or self.completed:
+            return False
+        return timezone.now() > self.due_date
+    
+    @property
+    def is_due_today(self):
+        """Check if the goal is due today"""
+        if not self.due_date:
+            return False
+        today = timezone.now().date()
+        return self.due_date.date() == today
+    
+    @property
+    def days_until_due(self):
+        """Get number of days until due date"""
+        if not self.due_date:
+            return None
+        today = timezone.now().date()
+        delta = self.due_date.date() - today
+        return delta.days
 
 
 class PVPRoom(models.Model):
