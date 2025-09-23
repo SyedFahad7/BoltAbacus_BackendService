@@ -101,14 +101,16 @@ import os
 import dj_database_url
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get(
-            'DATABASE_URL',
-            'postgresql://postgres:12345678@boltabacusdbs.cxoohqadjgtz.ap-south-1.rds.amazonaws.com:5432/boltabacusdb'
-        ),
-        conn_max_age=600
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'boltabacusdb',
+        'USER': 'postgres',
+        'PASSWORD': '12345678',
+        'HOST': 'boltabacusdbs.cxoohqadjgtz.ap-south-1.rds.amazonaws.com',
+        'PORT': '5432',
+    }
 }
+
 
 
 # AUTH_USER_MODEL = "Authentication.TopicDetails"
