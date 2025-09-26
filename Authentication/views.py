@@ -1917,6 +1917,7 @@ class GetStudentProgressFromStudent(APIView):
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
+            
             resp = getStudentProgress(user_id)
             try:
                 took_ms = int((time.time() - start_time) * 1000)
@@ -2812,7 +2813,8 @@ class SubmitPracticeQuestions(APIView):
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
             if not ifPracticeQuestionsAlreadyExists(data, userId):
-                PracticeQuestions.objects.create(
+                # Create practice question record
+                practice_record = PracticeQuestions.objects.create(
                     user_id = userId,
                     practiceType = practiceType,
                     operation = operation,
@@ -2827,6 +2829,22 @@ class SubmitPracticeQuestions(APIView):
                     averageTime = averageTime,
                     problemTimes = problemTimes
                 )
+                
+                # Update daily progress tracking
+                try:
+                    from .models import DailyProgress
+                    accuracy = (score / numberOfQuestions * 100) if numberOfQuestions > 0 else 0
+                    speed = (numberOfQuestions / (totalTime / 60)) if totalTime > 0 else 0  # problems per minute
+                    DailyProgress.update_daily_progress(
+                        user=user,
+                        accuracy=accuracy,
+                        speed=speed,
+                        time_spent=totalTime,
+                        activity_type='practice'
+                    )
+                except Exception as e:
+                    print(f"Warning: Failed to update daily progress: {e}")
+                
                 return Response({Constants.JSON_MESSAGE: "Practice Attempt stored Successfully"}, status=status.HTTP_200_OK)
             return Response({Constants.JSON_MESSAGE: "Practice Attempt already stored"}, status=status.HTTP_409_CONFLICT)
         except Exception as e:
@@ -3221,6 +3239,45 @@ class GetUserExperience(APIView):
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
+            # NEW: Build 7-day speed trend from DailyProgress with zero-fill
+            try:
+                from datetime import date, timedelta
+                from .models import DailyProgress, UserDetails
+                user = UserDetails.objects.filter(userId=user_id).first()
+                if user is None:
+                    return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+                end_date = date.today()
+                start_date = end_date - timedelta(days=6)
+                weekly_data = DailyProgress.objects.filter(user=user, date__range=[start_date, end_date]).order_by('date')
+                by_date = {dp.date: dp for dp in weekly_data}
+
+                daily_speed = []
+                labels = []
+                for i in range(7):
+                    d = start_date + timedelta(days=i)
+                    dp = by_date.get(d)
+                    daily_speed.append(round(dp.total_speed, 1) if dp else 0)
+                    if i == 0:
+                        labels.append('6d ago')
+                    elif i == 6:
+                        labels.append('Today')
+                    else:
+                        labels.append(d.strftime('%a'))
+
+                current_speed = daily_speed[-1] if daily_speed else 0
+                weekly_progress = round(daily_speed[-1] - daily_speed[0], 1) if len(daily_speed) >= 2 else 0
+
+                return Response({
+                    'currentSpeed': current_speed,
+                    'weeklyProgress': weekly_progress,
+                    'dailySpeed': daily_speed,
+                    'labels': labels
+                }, status=status.HTTP_200_OK)
+            except Exception as e:
+                # Fallback to older method below if DailyProgress path fails
+                pass
+            
             user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -3481,45 +3538,59 @@ class GetWeeklyStats(APIView):
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            # Calculate weekly stats (last 7 days)
-            from datetime import datetime, timedelta
-            week_ago = datetime.now() - timedelta(days=7)
+            # Calculate weekly stats (last 7 days) using DailyProgress
+            from datetime import datetime, timedelta, date
+            from .models import DailyProgress
             
-            # Get practice sessions from last week
-            weekly_sessions = Progress.objects.filter(
+            week_ago = date.today() - timedelta(days=7)
+            
+            # Get daily progress records from last week
+            weekly_progress = DailyProgress.objects.filter(
                 user=user,
-                created_at__gte=week_ago
-            ).count()
+                date__gte=week_ago
+            )
             
-            # Calculate accuracy (correct answers / total attempts)
-            total_attempts = Progress.objects.filter(
-                user=user,
-                created_at__gte=week_ago
-            ).aggregate(total=models.Sum('totalQuestions'))['total'] or 0
+            # Calculate aggregated stats
+            total_sessions = weekly_progress.aggregate(
+                total=models.Sum('total_activities')
+            )['total'] or 0
             
-            total_correct = Progress.objects.filter(
-                user=user,
-                created_at__gte=week_ago
-            ).aggregate(total=models.Sum('correctAnswers'))['total'] or 0
+            total_practice_sessions = weekly_progress.aggregate(
+                total=models.Sum('practice_sessions')
+            )['total'] or 0
             
-            accuracy = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            total_time_spent = weekly_progress.aggregate(
+                total=models.Sum('total_time_spent')
+            )['total'] or 0
             
-            # Calculate time spent (in seconds)
-            time_spent = Progress.objects.filter(
-                user=user,
-                created_at__gte=week_ago
-            ).aggregate(total=models.Sum('timeSpent'))['total'] or 0
+            # Calculate weighted average accuracy
+            total_activities = weekly_progress.aggregate(
+                total=models.Sum('total_activities')
+            )['total'] or 0
             
-            # Convert to hours and minutes
-            hours = int(time_spent // 3600)
-            minutes = int((time_spent % 3600) // 60)
+            if total_activities > 0:
+                weighted_accuracy = 0
+                for progress in weekly_progress:
+                    weighted_accuracy += progress.total_accuracy * progress.total_activities
+                accuracy = weighted_accuracy / total_activities
+            else:
+                accuracy = 0
+            
+            # Convert time to hours and minutes
+            hours = int(total_time_spent // 3600)
+            minutes = int((total_time_spent % 3600) // 60)
+            
+            # Calculate problems solved (estimate based on practice sessions and average)
+            problems_solved = total_practice_sessions * 10  # Assume 10 problems per session average
             
             stats_data = {
-                'sessions': weekly_sessions,
+                'sessions': total_practice_sessions,
                 'accuracy': round(accuracy, 1),
                 'time_spent_hours': hours,
                 'time_spent_minutes': minutes,
-                'time_spent_formatted': f"{hours}h {minutes}m"
+                'time_spent_formatted': f"{hours}h {minutes}m",
+                'problems_solved': problems_solved,
+                'total_activities': total_activities
             }
             
             return Response({
@@ -4339,6 +4410,21 @@ class SubmitPVPGameResult(APIView):
             player.status = 'finished'  # Mark player as finished
             player.finished_at = timezone.now()
             player.save()
+            
+            # Update daily progress tracking for PVP
+            try:
+                from .models import DailyProgress
+                accuracy = (correct_answers / room.number_of_questions * 100) if room.number_of_questions > 0 else 0
+                speed = (room.number_of_questions / (total_time / 60)) if total_time > 0 else 0  # problems per minute
+                DailyProgress.update_daily_progress(
+                    user=user,
+                    accuracy=accuracy,
+                    speed=speed,
+                    time_spent=total_time,
+                    activity_type='practice'  # PVP counts as practice
+                )
+            except Exception as e:
+                print(f"Warning: Failed to update daily progress for PVP: {e}")
             
             # Check if all players have finished
             all_players = room.players.all()
@@ -5167,3 +5253,307 @@ class GetSpeedTrend(APIView):
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: f"Error getting speed trend: {str(e)}"}, 
                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPracticeAccuracyTrend(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            from datetime import date, timedelta
+            from .models import PracticeQuestions, UserDetails
+
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            end_date = date.today()
+            start_date = end_date - timedelta(days=6)
+
+            daily_accuracy = []
+            labels = []
+            
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                day_practice = PracticeQuestions.objects.filter(
+                    user=user,
+                    created_at__date=d
+                )
+                
+                if day_practice.exists():
+                    total_questions = 0
+                    total_correct = 0
+                    
+                    for session in day_practice:
+                        if session.problemTimes and len(session.problemTimes) > 0:
+                            for problem_time in session.problemTimes:
+                                total_questions += 1
+                                if problem_time.get('isCorrect', False):
+                                    total_correct += 1
+                        else:
+                            total_questions += session.numberOfQuestions
+                            total_correct += session.score
+                    
+                    accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
+                else:
+                    accuracy = 0
+                
+                daily_accuracy.append(round(accuracy, 1))
+                
+                if i == 0:
+                    labels.append('6d ago')
+                elif i == 6:
+                    labels.append('Today')
+                else:
+                    labels.append(d.strftime('%a'))
+
+            current_accuracy = daily_accuracy[-1] if daily_accuracy else 0
+            weekly_progress = round(daily_accuracy[-1] - daily_accuracy[0], 1) if len(daily_accuracy) >= 2 else 0
+
+            return Response({
+                'currentAccuracy': current_accuracy,
+                'weeklyProgress': weekly_progress,
+                'dailyAccuracy': daily_accuracy,
+                'labels': labels
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting practice accuracy trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPracticeSpeedTrend(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            from datetime import date, timedelta
+            from .models import PracticeQuestions, UserDetails
+
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            end_date = date.today()
+            start_date = end_date - timedelta(days=6)
+
+            daily_speed = []
+            labels = []
+            
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                day_practice = PracticeQuestions.objects.filter(
+                    user=user,
+                    created_at__date=d
+                )
+                
+                if day_practice.exists():
+                    total_problems = 0
+                    total_time_minutes = 0
+                    
+                    for session in day_practice:
+                        if session.problemTimes and len(session.problemTimes) > 0:
+                            for problem_time in session.problemTimes:
+                                if not problem_time.get('isSkipped', False):
+                                    total_problems += 1
+                                    total_time_minutes += problem_time.get('timeSpent', 0) / 60
+                        else:
+                            total_problems += session.numberOfQuestions
+                            total_time_minutes += session.totalTime / 60
+                    
+                    speed = (total_problems / total_time_minutes) if total_time_minutes > 0 else 0
+                else:
+                    speed = 0
+                
+                daily_speed.append(round(speed, 1))
+                
+                if i == 0:
+                    labels.append('6d ago')
+                elif i == 6:
+                    labels.append('Today')
+                else:
+                    labels.append(d.strftime('%a'))
+
+            current_speed = daily_speed[-1] if daily_speed else 0
+            weekly_progress = round(daily_speed[-1] - daily_speed[0], 1) if len(daily_speed) >= 2 else 0
+
+            return Response({
+                'currentSpeed': current_speed,
+                'weeklyProgress': weekly_progress,
+                'dailySpeed': daily_speed,
+                'labels': labels
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting practice speed trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPvpAccuracyTrend(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            from datetime import date, timedelta
+            from .models import PVPGameResult, UserDetails
+
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            end_date = date.today()
+            start_date = end_date - timedelta(days=6)
+
+            daily_accuracy = []
+            labels = []
+            
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                day_pvp = PVPGameResult.objects.filter(
+                    player__player=user,
+                    created_at__date=d
+                )
+                
+                if day_pvp.exists():
+                    total_questions = 0
+                    total_correct = 0
+                    
+                    for result in day_pvp:
+                        total_questions += result.questionsAnswered
+                        total_correct += result.correctAnswers
+                    
+                    accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
+                else:
+                    accuracy = 0
+                
+                daily_accuracy.append(round(accuracy, 1))
+                
+                if i == 0:
+                    labels.append('6d ago')
+                elif i == 6:
+                    labels.append('Today')
+                else:
+                    labels.append(d.strftime('%a'))
+
+            current_accuracy = daily_accuracy[-1] if daily_accuracy else 0
+            weekly_progress = round(daily_accuracy[-1] - daily_accuracy[0], 1) if len(daily_accuracy) >= 2 else 0
+
+            return Response({
+                'currentAccuracy': current_accuracy,
+                'weeklyProgress': weekly_progress,
+                'dailyAccuracy': daily_accuracy,
+                'labels': labels
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting PvP accuracy trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPvpSpeedTrend(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            from datetime import date, timedelta
+            from .models import PVPGameResult, UserDetails
+
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            end_date = date.today()
+            start_date = end_date - timedelta(days=6)
+
+            daily_speed = []
+            labels = []
+            
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                day_pvp = PVPGameResult.objects.filter(
+                    player__player=user,
+                    created_at__date=d
+                )
+                
+                if day_pvp.exists():
+                    total_problems = 0
+                    total_time_minutes = 0
+                    
+                    for result in day_pvp:
+                        total_problems += result.questionsAnswered
+                        total_time_minutes += (result.totalTime or 0) / 60
+                    
+                    speed = (total_problems / total_time_minutes) if total_time_minutes > 0 else 0
+                else:
+                    speed = 0
+                
+                daily_speed.append(round(speed, 1))
+                
+                if i == 0:
+                    labels.append('6d ago')
+                elif i == 6:
+                    labels.append('Today')
+                else:
+                    labels.append(d.strftime('%a'))
+
+            current_speed = daily_speed[-1] if daily_speed else 0
+            weekly_progress = round(daily_speed[-1] - daily_speed[0], 1) if len(daily_speed) >= 2 else 0
+
+            return Response({
+                'currentSpeed': current_speed,
+                'weeklyProgress': weekly_progress,
+                'dailySpeed': daily_speed,
+                'labels': labels
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting PvP speed trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

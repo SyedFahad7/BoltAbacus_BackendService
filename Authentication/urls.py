@@ -97,5 +97,10 @@ urlpatterns = [
     # Trend APIs
     path('accuracyTrend/', views.GetAccuracyTrend.as_view()),
     path('speedTrend/', views.GetSpeedTrend.as_view()),
+    # New separate trend endpoints
+    path('practiceAccuracyTrend/', views.GetPracticeAccuracyTrend.as_view()),
+    path('practiceSpeedTrend/', views.GetPracticeSpeedTrend.as_view()),
+    path('pvpAccuracyTrend/', views.GetPvpAccuracyTrend.as_view()),
+    path('pvpSpeedTrend/', views.GetPvpSpeedTrend.as_view()),
 
 ]
