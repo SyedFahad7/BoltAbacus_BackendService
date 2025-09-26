@@ -2029,6 +2029,9 @@ def getStudentProgress(userId):
         practice_sessions = PracticeQuestions.objects.filter(user_id=userId)
         total_practice_sessions = practice_sessions.count()
         
+        # Debug: Log practice sessions
+        print(f"🔍 [getStudentProgress] Found {total_practice_sessions} practice sessions for user {userId}")
+        
         # Calculate detailed stats using problemTimes if available
         total_practice_correct = 0
         total_practice_questions = 0
@@ -2036,11 +2039,15 @@ def getStudentProgress(userId):
         detailed_sessions = []
         
         for session in practice_sessions:
+            print(f"   Session {session.practiceQuestionId}: score={session.score}, questions={session.numberOfQuestions}, problemTimes={len(session.problemTimes) if session.problemTimes else 0}")
+            
             if session.problemTimes and len(session.problemTimes) > 0:
                 # Use detailed problem times for accurate calculation
                 session_correct = sum(1 for pt in session.problemTimes if pt.get('isCorrect', False))
                 session_questions = len(session.problemTimes)
                 session_time = sum(pt.get('timeSpent', 0) for pt in session.problemTimes)
+                
+                print(f"     Using problemTimes: correct={session_correct}, questions={session_questions}, time={session_time}")
                 
                 total_practice_correct += session_correct
                 total_practice_questions += session_questions
@@ -2059,6 +2066,8 @@ def getStudentProgress(userId):
                 })
             else:
                 # Fallback to session-level data
+                print(f"     Using session data: score={session.score}, questions={session.numberOfQuestions}, time={session.totalTime}")
+                
                 total_practice_correct += session.score
                 total_practice_questions += session.numberOfQuestions
                 total_practice_time += session.totalTime
@@ -2074,6 +2083,8 @@ def getStudentProgress(userId):
                     "problemTimes": [],
                     "created_at": session.created_at.isoformat() if session.created_at else None
                 })
+        
+        print(f"📊 [getStudentProgress] Calculated totals: correct={total_practice_correct}, questions={total_practice_questions}, time={total_practice_time}")
         
         # Calculate recent practice sessions (last 7 days)
         from datetime import datetime, timedelta
@@ -2093,6 +2104,9 @@ def getStudentProgress(userId):
             "totalPracticeTime": total_practice_time,
             "practiceSessions": detailed_sessions[:10]  # Last 10 sessions with detailed data
         }
+        
+        # Debug: Log the final practice stats
+        print(f"📊 [getStudentProgress] Final practice stats: {practice_stats}")
         
         # Calculate PvP stats from PVPRoomPlayer model
         pvp_sessions = PVPRoomPlayer.objects.filter(player=user, status='finished')
@@ -2797,6 +2811,11 @@ class SubmitPracticeQuestions(APIView):
                 return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
             user = UserDetails.objects.filter(userId=userId).first()
             data = request.data
+            
+            # Debug: Log the received data
+            print(f"🔍 [SubmitPracticeQuestions] Received data for user {userId}:")
+            print(f"   Raw data: {data}")
+            
             practiceType = data[Constants.PRACTICE_TYPE]
             operation = data[Constants.OPERATION]
             numberOfDigits = data[Constants.NUMBER_OF_DIGITS]
@@ -2809,6 +2828,15 @@ class SubmitPracticeQuestions(APIView):
             totalTime = data[Constants.TOTAL_TIME]
             averageTime = data[Constants.AVERAGE_TIME]  
             problemTimes = data.get('problemTimes', [])  # Get detailed problem times
+            
+            # Debug: Log the extracted values
+            print(f"   Extracted values:")
+            print(f"     practiceType: {practiceType}")
+            print(f"     operation: {operation}")
+            print(f"     numberOfQuestions: {numberOfQuestions}")
+            print(f"     score: {score}")
+            print(f"     totalTime: {totalTime}")
+            print(f"     problemTimes: {problemTimes}")
             
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
@@ -2989,7 +3017,14 @@ def getStudentPracticeStatistics(userId):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def ifPracticeQuestionsAlreadyExists(data, userId):
-    practiceQuestions =  PracticeQuestions.objects.filter(
+    # Only check for very recent duplicate submissions (within last 30 seconds)
+    # This prevents accidental double-submissions while allowing legitimate practice sessions
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    recent_time = timezone.now() - timedelta(seconds=30)
+    
+    practiceQuestions = PracticeQuestions.objects.filter(
         user_id=userId,
         practiceType=data[Constants.PRACTICE_TYPE],
         operation=data[Constants.OPERATION],
@@ -2999,9 +3034,9 @@ def ifPracticeQuestionsAlreadyExists(data, userId):
         zigZag=data[Constants.ZIG_ZAG],
         includeSubtraction=data[Constants.INCLUDE_SUBTRACTION],
         persistNumberOfDigits=data[Constants.PERSIST_NUMBER_OF_DIGITS],
-        score=data[Constants.SCORE],
-        totalTime=data[Constants.TOTAL_TIME],
-        averageTime=data[Constants.AVERAGE_TIME]).first()
+        created_at__gte=recent_time
+    ).first()
+    
     if practiceQuestions is None:
         return False
     return True
