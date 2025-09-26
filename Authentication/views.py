@@ -5566,3 +5566,209 @@ class GetPvpSpeedTrend(APIView):
 
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: f"Error getting PvP speed trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetClassRank(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get user's batch
+            student = Student.objects.filter(user_id=userId).first()
+            if student is None:
+                return Response({Constants.JSON_MESSAGE: "Student record not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+            batch_id = student.batch_id
+            
+            # Get all students in the same batch with their practice stats
+            batch_students = Student.objects.filter(batch_id=batch_id).select_related('user')
+            
+            student_rankings = []
+            for batch_student in batch_students:
+                # Get practice stats for this student
+                practice_sessions = PracticeQuestions.objects.filter(user_id=batch_student.user_id)
+                
+                total_sessions = practice_sessions.count()
+                total_correct = 0
+                total_questions = 0
+                total_time = 0
+                
+                for session in practice_sessions:
+                    total_correct += session.score
+                    total_questions += session.numberOfQuestions
+                    total_time += session.totalTime
+                
+                accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
+                speed = (total_questions / (total_time / 60)) if total_time > 0 else 0  # problems per minute
+                
+                student_rankings.append({
+                    'userId': batch_student.user_id,
+                    'firstName': batch_student.user.firstName,
+                    'lastName': batch_student.user.lastName,
+                    'totalSessions': total_sessions,
+                    'totalCorrect': total_correct,
+                    'totalQuestions': total_questions,
+                    'accuracy': round(accuracy, 1),
+                    'speed': round(speed, 1),
+                    'totalTime': total_time
+                })
+            
+            # Sort by accuracy (primary) and speed (secondary)
+            student_rankings.sort(key=lambda x: (x['accuracy'], x['speed']), reverse=True)
+            
+            # Find current user's rank
+            current_user_rank = 0
+            for i, student_data in enumerate(student_rankings):
+                if student_data['userId'] == userId:
+                    current_user_rank = i + 1
+                    break
+            
+            return Response({
+                'success': True,
+                'currentUserRank': current_user_rank,
+                'totalStudents': len(student_rankings),
+                'rankings': student_rankings[:10]  # Top 10 students
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetLeaderboards(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get user's batch
+            student = Student.objects.filter(user_id=userId).first()
+            if student is None:
+                return Response({Constants.JSON_MESSAGE: "Student record not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+            batch_id = student.batch_id
+            
+            # Get all students in the same batch with their practice stats
+            batch_students = Student.objects.filter(batch_id=batch_id).select_related('user')
+            
+            speed_leaderboard = []
+            accuracy_leaderboard = []
+            
+            for batch_student in batch_students:
+                # Get practice stats for this student
+                practice_sessions = PracticeQuestions.objects.filter(user_id=batch_student.user_id)
+                
+                total_sessions = practice_sessions.count()
+                total_correct = 0
+                total_questions = 0
+                total_time = 0
+                
+                for session in practice_sessions:
+                    total_correct += session.score
+                    total_questions += session.numberOfQuestions
+                    total_time += session.totalTime
+                
+                accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
+                speed = (total_questions / (total_time / 60)) if total_time > 0 else 0  # problems per minute
+                
+                student_data = {
+                    'userId': batch_student.user_id,
+                    'firstName': batch_student.user.firstName,
+                    'lastName': batch_student.user.lastName,
+                    'totalSessions': total_sessions,
+                    'accuracy': round(accuracy, 1),
+                    'speed': round(speed, 1),
+                    'isCurrentUser': batch_student.user_id == userId
+                }
+                
+                speed_leaderboard.append(student_data)
+                accuracy_leaderboard.append(student_data)
+            
+            # Sort leaderboards
+            speed_leaderboard.sort(key=lambda x: x['speed'], reverse=True)
+            accuracy_leaderboard.sort(key=lambda x: x['accuracy'], reverse=True)
+            
+            return Response({
+                'success': True,
+                'speedLeaderboard': speed_leaderboard[:10],  # Top 10
+                'accuracyLeaderboard': accuracy_leaderboard[:10]  # Top 10
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetModeDistribution(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            requestUserToken = request.headers[Constants.TOKEN_HEADER]
+            try:
+                userId = IdExtraction(requestUserToken)
+                if isinstance(userId, Exception):
+                    raise Exception(Constants.INVALID_TOKEN_MESSAGE)
+            except Exception as e:
+                return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_403_FORBIDDEN)
+            
+            user = UserDetails.objects.filter(userId=userId).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User doesn't exist."}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get practice sessions for the user
+            practice_sessions = PracticeQuestions.objects.filter(user_id=userId)
+            
+            # Count sessions by practice type
+            mode_counts = {}
+            total_sessions = practice_sessions.count()
+            
+            for session in practice_sessions:
+                practice_type = session.practiceType
+                if practice_type in mode_counts:
+                    mode_counts[practice_type] += 1
+                else:
+                    mode_counts[practice_type] = 1
+            
+            # Convert to percentage and format for pie chart
+            mode_distribution = []
+            for mode, count in mode_counts.items():
+                percentage = (count / total_sessions * 100) if total_sessions > 0 else 0
+                mode_distribution.append({
+                    'mode': mode.title(),
+                    'count': count,
+                    'percentage': round(percentage, 1)
+                })
+            
+            # Sort by count (descending)
+            mode_distribution.sort(key=lambda x: x['count'], reverse=True)
+            
+            return Response({
+                'success': True,
+                'totalSessions': total_sessions,
+                'modeDistribution': mode_distribution
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
