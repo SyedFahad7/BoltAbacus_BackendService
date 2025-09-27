@@ -3309,6 +3309,11 @@ class GetUserExperience(APIView):
                 'xp_to_next_level': xp_to_next
             }
             
+            print(f"💰 [GetUserExperience] Returning XP data for {user.firstName} {user.lastName}:")
+            print(f"   User ID: {user.userId}")
+            print(f"   Experience Points: {user_exp.experience_points}")
+            print(f"   Level: {user_exp.level}")
+            
             return Response({
                 'success': True,
                 'data': exp_data
@@ -4790,9 +4795,9 @@ class GetPVPLeaderboard(APIView):
             # Get top 10 players by experience points (only those with XP > 0)
             top_players = UserExperience.objects.select_related('user').filter(experience_points__gt=0).order_by('-experience_points')[:10]
             
-            print(f"Debug: Found {top_players.count()} players with experience > 0")
+            print(f"🏆 [GetPVPLeaderboard] Found {top_players.count()} players with experience > 0")
             for player in top_players:
-                print(f"Debug: Player {player.user.firstName} - XP: {player.experience_points}")
+                print(f"🏆 [GetPVPLeaderboard] Player {player.user.firstName} {player.user.lastName} (ID:{player.user.userId}) - XP: {player.experience_points}")
             
             leaderboard_data = []
             for rank, player in enumerate(top_players, 1):
