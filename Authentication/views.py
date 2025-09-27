@@ -3360,6 +3360,54 @@ class GetCommunityStats(APIView):
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetUserXPSimple(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get user and their XP directly
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            user_exp, created = UserExperience.objects.get_or_create(
+                user=user,
+                defaults={'experience_points': 0, 'level': 1}
+            )
+            
+            print(f"💰 [GetUserXPSimple] User {user.firstName} {user.lastName} (ID:{user.userId}) - XP: {user_exp.experience_points}")
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'experience_points': user_exp.experience_points,
+                    'level': user_exp.level
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ [GetUserXPSimple] Error: {repr(e)}")
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class GetUserStats(APIView):
     permission_classes = [AllowAny]
 
