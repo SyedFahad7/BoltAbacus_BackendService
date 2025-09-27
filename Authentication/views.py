@@ -4381,6 +4381,8 @@ class SubmitPVPGameResult(APIView):
 
     def post(self, request):
         try:
+            print(f"🎮 PVP RESULT SUBMISSION - Request data: {request.data}")
+            
             requestUserToken = request.headers[Constants.TOKEN_HEADER]
             try:
                 userId = IdExtraction(requestUserToken)
@@ -4391,6 +4393,7 @@ class SubmitPVPGameResult(APIView):
             
             user = UserDetails.objects.filter(userId=userId).first()
             if user is None:
+                print(f"❌ PVP SUBMIT ERROR: User not found for userId: {userId}")
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
             
             room_id = request.data.get('room_id')
@@ -4398,6 +4401,9 @@ class SubmitPVPGameResult(APIView):
             correct_answers = request.data.get('correct_answers', 0)
             total_time = request.data.get('total_time', 0)
             problem_times = request.data.get('problemTimes', [])
+            
+            print(f"🎮 PVP SUBMIT: User {user.firstName} ({userId}) - Room {room_id}")
+            print(f"📊 PVP STATS: Score={score}, Correct={correct_answers}, Time={total_time}s, ProblemTimes={len(problem_times)} entries")
             
             if not room_id:
                 return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -4424,8 +4430,10 @@ class SubmitPVPGameResult(APIView):
             try:
                 from .models import PvPRoomResult
                 accuracy_percentage = (correct_answers / room.number_of_questions * 100) if room.number_of_questions > 0 else 0
-                speed_per_minute = (room.number_of_questions / (total_time / 60)) if total_time > 0 else 0
+                speed_per_minute = (correct_answers / (total_time / 60)) if total_time > 0 else 0  # Use correct_answers instead of total questions for actual speed
                 average_time_per_question = (total_time / room.number_of_questions) if room.number_of_questions > 0 else 0
+                
+                print(f"📈 PVP CALCULATIONS: Accuracy={accuracy_percentage:.1f}%, Speed={speed_per_minute:.1f} problems/min, AvgTime={average_time_per_question:.1f}s")
                 
                 # Create or update PvPRoomResult
                 pvp_result, created = PvPRoomResult.objects.get_or_create(
@@ -4445,6 +4453,7 @@ class SubmitPVPGameResult(APIView):
                 
                 if not created:
                     # Update existing result
+                    print(f"🔄 PVP RESULT UPDATE: Updating existing PvPRoomResult for room {room_id}")
                     pvp_result.questions_answered = room.number_of_questions
                     pvp_result.correct_answers = correct_answers
                     pvp_result.total_time = total_time
@@ -4454,9 +4463,16 @@ class SubmitPVPGameResult(APIView):
                     pvp_result.score = score
                     pvp_result.problem_times = problem_times
                     pvp_result.save()
+                else:
+                    print(f"✅ PVP RESULT CREATED: New PvPRoomResult saved for room {room_id}")
+                
+                # Log the saved data for debugging
+                print(f"💾 PVP DATA SAVED: Room={room_id}, User={user.firstName}, Questions={pvp_result.questions_answered}, Correct={pvp_result.correct_answers}, Time={pvp_result.total_time}s, Speed={pvp_result.speed_per_minute:.1f}")
                     
             except Exception as e:
-                print(f"Warning: Failed to create PvPRoomResult: {e}")
+                print(f"❌ ERROR: Failed to create PvPRoomResult: {e}")
+                import traceback
+                print(f"❌ PVP RESULT ERROR TRACEBACK: {traceback.format_exc()}")
             
             # Update daily progress tracking for PVP
             try:
@@ -5557,6 +5573,8 @@ class GetPvpSpeedTrend(APIView):
 
     def post(self, request):
         try:
+            print(f"📊 PVP SPEED TREND REQUEST: {request.data}")
+            
             auth_token = request.headers.get(Constants.TOKEN_HEADER)
             if not auth_token:
                 return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -5574,10 +5592,19 @@ class GetPvpSpeedTrend(APIView):
 
             user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
+                print(f"❌ PVP SPEED: User not found for userId: {user_id}")
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
+            print(f"📊 PVP SPEED: Getting trend for user {user.firstName} ({user_id})")
+            
             end_date = date.today()
             start_date = end_date - timedelta(days=6)
+            
+            print(f"📅 PVP SPEED: Checking dates from {start_date} to {end_date}")
+            
+            # Check total PvP records for this user
+            total_pvp_records = PvPRoomResult.objects.filter(player=user).count()
+            print(f"📊 PVP SPEED: User has {total_pvp_records} total PvP records")
 
             daily_speed = []
             labels = []
@@ -5589,17 +5616,22 @@ class GetPvpSpeedTrend(APIView):
                     created_at__date=d
                 )
                 
+                print(f"📅 PVP SPEED: Date {d} - Found {day_pvp.count()} PvP records")
+                
                 if day_pvp.exists():
-                    total_problems = 0
+                    total_correct_answers = 0
                     total_time_minutes = 0
                     
                     for result in day_pvp:
-                        total_problems += result.questions_answered
+                        total_correct_answers += result.correct_answers  # Use correct answers for speed calculation
                         total_time_minutes += (result.total_time or 0) / 60
+                        print(f"  📊 PVP Record: Correct={result.correct_answers}, Time={result.total_time}s, Speed={result.speed_per_minute:.1f}")
                     
-                    speed = (total_problems / total_time_minutes) if total_time_minutes > 0 else 0
+                    speed = (total_correct_answers / total_time_minutes) if total_time_minutes > 0 else 0
+                    print(f"  ⚡ Day Speed: {total_correct_answers} correct / {total_time_minutes:.1f} min = {speed:.1f} problems/min")
                 else:
                     speed = 0
+                    print(f"  ⚡ Day Speed: 0 (no PvP games)")
                 
                 daily_speed.append(round(speed, 1))
                 
