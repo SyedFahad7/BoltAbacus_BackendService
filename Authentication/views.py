@@ -4815,6 +4815,8 @@ class GetPVPLeaderboard(APIView):
                     'level': current_level
                 })
             
+            print(f"🏆 [GetPVPLeaderboard] Sending leaderboard with {len(leaderboard_data)} players")
+            
             return Response({
                 'success': True,
                 'data': {
