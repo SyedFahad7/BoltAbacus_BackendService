@@ -4420,6 +4420,44 @@ class SubmitPVPGameResult(APIView):
             player.finished_at = timezone.now()
             player.save()
             
+            # Create PvPRoomResult for trend calculations
+            try:
+                from .models import PvPRoomResult
+                accuracy_percentage = (correct_answers / room.number_of_questions * 100) if room.number_of_questions > 0 else 0
+                speed_per_minute = (room.number_of_questions / (total_time / 60)) if total_time > 0 else 0
+                average_time_per_question = (total_time / room.number_of_questions) if room.number_of_questions > 0 else 0
+                
+                # Create or update PvPRoomResult
+                pvp_result, created = PvPRoomResult.objects.get_or_create(
+                    room=room,
+                    player=user,
+                    defaults={
+                        'questions_answered': room.number_of_questions,
+                        'correct_answers': correct_answers,
+                        'total_time': total_time,
+                        'average_time_per_question': average_time_per_question,
+                        'accuracy_percentage': accuracy_percentage,
+                        'speed_per_minute': speed_per_minute,
+                        'score': score,
+                        'problem_times': problem_times,
+                    }
+                )
+                
+                if not created:
+                    # Update existing result
+                    pvp_result.questions_answered = room.number_of_questions
+                    pvp_result.correct_answers = correct_answers
+                    pvp_result.total_time = total_time
+                    pvp_result.average_time_per_question = average_time_per_question
+                    pvp_result.accuracy_percentage = accuracy_percentage
+                    pvp_result.speed_per_minute = speed_per_minute
+                    pvp_result.score = score
+                    pvp_result.problem_times = problem_times
+                    pvp_result.save()
+                    
+            except Exception as e:
+                print(f"Warning: Failed to create PvPRoomResult: {e}")
+            
             # Update daily progress tracking for PVP
             try:
                 from .models import DailyProgress
@@ -4489,6 +4527,13 @@ class SubmitPVPGameResult(APIView):
                         experience_awarded=20
                     )
                     
+                    # Update PvPRoomResult records for draw
+                    try:
+                        from .models import PvPRoomResult
+                        PvPRoomResult.objects.filter(room=room).update(is_draw=True, is_winner=False)
+                    except Exception as e:
+                        print(f"Warning: Failed to update PvPRoomResult for draw: {e}")
+                    
                     # Determine current user's experience
                     current_user_experience = 20 if user.score == max_score else 10
                     
@@ -4513,6 +4558,17 @@ class SubmitPVPGameResult(APIView):
                         winner_time=winner.total_time if winner else 0,
                         experience_awarded=50 if winner else 20  # Winner gets 50 XP, draw gives 20 each (handled above), losers 10
                     )
+                    
+                    # Update PvPRoomResult records for winner/loser status
+                    try:
+                        from .models import PvPRoomResult
+                        # Mark winner
+                        if winner:
+                            PvPRoomResult.objects.filter(room=room, player=winner.player).update(is_winner=True, is_draw=False)
+                        # Mark losers
+                        PvPRoomResult.objects.filter(room=room).exclude(player=winner.player if winner else None).update(is_winner=False, is_draw=False)
+                    except Exception as e:
+                        print(f"Warning: Failed to update PvPRoomResult for winner/loser: {e}")
                     
                     # Award experience to winner
                     if winner:
@@ -5441,7 +5497,7 @@ class GetPvpAccuracyTrend(APIView):
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
 
             from datetime import date, timedelta
-            from .models import PVPGameResult, UserDetails
+            from .models import PvPRoomResult, UserDetails
 
             user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
@@ -5455,8 +5511,8 @@ class GetPvpAccuracyTrend(APIView):
             
             for i in range(7):
                 d = start_date + timedelta(days=i)
-                day_pvp = PVPGameResult.objects.filter(
-                    player__player=user,
+                day_pvp = PvPRoomResult.objects.filter(
+                    player=user,
                     created_at__date=d
                 )
                 
@@ -5465,8 +5521,8 @@ class GetPvpAccuracyTrend(APIView):
                     total_correct = 0
                     
                     for result in day_pvp:
-                        total_questions += result.questionsAnswered
-                        total_correct += result.correctAnswers
+                        total_questions += result.questions_answered
+                        total_correct += result.correct_answers
                     
                     accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
                 else:
@@ -5514,7 +5570,7 @@ class GetPvpSpeedTrend(APIView):
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
 
             from datetime import date, timedelta
-            from .models import PVPGameResult, UserDetails
+            from .models import PvPRoomResult, UserDetails
 
             user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
@@ -5528,8 +5584,8 @@ class GetPvpSpeedTrend(APIView):
             
             for i in range(7):
                 d = start_date + timedelta(days=i)
-                day_pvp = PVPGameResult.objects.filter(
-                    player__player=user,
+                day_pvp = PvPRoomResult.objects.filter(
+                    player=user,
                     created_at__date=d
                 )
                 
@@ -5538,8 +5594,8 @@ class GetPvpSpeedTrend(APIView):
                     total_time_minutes = 0
                     
                     for result in day_pvp:
-                        total_problems += result.questionsAnswered
-                        total_time_minutes += (result.totalTime or 0) / 60
+                        total_problems += result.questions_answered
+                        total_time_minutes += (result.total_time or 0) / 60
                     
                     speed = (total_problems / total_time_minutes) if total_time_minutes > 0 else 0
                 else:

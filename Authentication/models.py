@@ -309,6 +309,33 @@ class PVPGameResult(models.Model):
         return f"Result for Room {self.room.room_id} - Winner: {self.winner.firstName if self.winner else 'None'}"
 
 
+class PvPRoomResult(models.Model):
+    """Track individual player results for each PvP room for trend calculations"""
+    room = models.ForeignKey(PVPRoom, to_field='room_id', on_delete=models.CASCADE, related_name='room_results')
+    player = models.ForeignKey(UserDetails, to_field='userId', on_delete=models.CASCADE, related_name='pvp_room_results')
+    questions_answered = models.IntegerField(default=0)
+    correct_answers = models.IntegerField(default=0)
+    total_time = models.FloatField(default=0)  # in seconds
+    average_time_per_question = models.FloatField(default=0)  # in seconds
+    accuracy_percentage = models.FloatField(default=0)  # 0-100
+    speed_per_minute = models.FloatField(default=0)  # questions per minute
+    score = models.IntegerField(default=0)
+    is_winner = models.BooleanField(default=False)
+    is_draw = models.BooleanField(default=False)
+    problem_times = models.JSONField(default=list, blank=True)  # Store detailed problem times
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['room', 'player']
+        indexes = [
+            models.Index(fields=['player', 'created_at']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.player.firstName} - Room {self.room.room_id} - {self.correct_answers}/{self.questions_answered} correct"
+
+
 # Additional models for future features
 class UserStreak(models.Model):
     id = models.BigAutoField(primary_key=True)
