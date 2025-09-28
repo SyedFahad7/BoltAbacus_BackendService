@@ -4457,6 +4457,7 @@ class SubmitPVPGameResult(APIView):
             
             print(f"🎮 PVP SUBMIT: User {user.firstName} ({userId}) - Room {room_id}")
             print(f"📊 PVP STATS: Score={score}, Correct={correct_answers}, Time={total_time}s, ProblemTimes={len(problem_times)} entries")
+            print(f"📊 PVP STATS DEBUG: total_time type={type(total_time)}, value={total_time}, correct_answers type={type(correct_answers)}, value={correct_answers}")
             
             if not room_id:
                 return Response({Constants.JSON_MESSAGE: "Room ID is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -4521,6 +4522,7 @@ class SubmitPVPGameResult(APIView):
                 
                 # Log the saved data for debugging
                 print(f"💾 PVP DATA SAVED: Room={room_id}, User={user.firstName}, Questions={pvp_result.questions_answered}, Correct={pvp_result.correct_answers}, Time={pvp_result.total_time}s, Speed={pvp_result.speed_per_minute:.1f}")
+                print(f"💾 PVP DATA DEBUG: total_time={pvp_result.total_time}, correct_answers={pvp_result.correct_answers}, speed_per_minute={pvp_result.speed_per_minute}")
                     
             except Exception as e:
                 print(f"❌ ERROR: Failed to create PvPRoomResult: {e}")
@@ -5678,7 +5680,18 @@ class GetPvpSpeedTrend(APIView):
             all_pvp_records = PvPRoomResult.objects.filter(player=user).order_by('-created_at')
             print(f"📊 PVP SPEED: All PvP records for user {user.firstName}:")
             for record in all_pvp_records[:5]:  # Show last 5 records
-                print(f"  - Room: {record.room.room_id}, Correct: {record.correct_answers}, Time: {record.total_time}s, Created: {record.created_at}")
+                print(f"  - Room: {record.room.room_id}, Correct: {record.correct_answers}, Time: {record.total_time}s, Speed: {record.speed_per_minute}, Created: {record.created_at}")
+            
+            # Debug: Check if there are any records in the date range
+            print(f"📊 PVP SPEED: Checking for records in date range {start_date} to {end_date}")
+            records_in_range = PvPRoomResult.objects.filter(
+                player=user,
+                created_at__gte=start_date,
+                created_at__lt=end_date + timedelta(days=1)
+            )
+            print(f"📊 PVP SPEED: Found {records_in_range.count()} records in date range")
+            for record in records_in_range:
+                print(f"  - Room: {record.room.room_id}, Correct: {record.correct_answers}, Time: {record.total_time}s, Speed: {record.speed_per_minute}, Created: {record.created_at}")
 
             daily_speed = []
             labels = []
@@ -5705,6 +5718,7 @@ class GetPvpSpeedTrend(APIView):
                         total_correct_answers += result.correct_answers  # Use correct answers for speed calculation
                         total_time_minutes += (result.total_time or 0) / 60
                         print(f"  📊 PVP Record: Correct={result.correct_answers}, Time={result.total_time}s, Speed={result.speed_per_minute:.1f}, Created={result.created_at}")
+                        print(f"  📊 PVP Record Debug: total_time={result.total_time}, total_time_minutes={total_time_minutes}, correct_answers={total_correct_answers}")
                     
                     speed = (total_correct_answers / total_time_minutes) if total_time_minutes > 0 else 0
                     print(f"  ⚡ Day Speed: {total_correct_answers} correct / {total_time_minutes:.1f} min = {speed:.1f} problems/min")
