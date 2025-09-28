@@ -4849,18 +4849,26 @@ class GetPVPLeaderboard(APIView):
             
             leaderboard_data = []
             for rank, player in enumerate(top_players, 1):
-                # Calculate current level based on experience points
+                # Calculate XP-based level
                 if player.experience_points <= 90:
-                    current_level = 1
+                    xp_level = 1
                 else:
-                    current_level = ((player.experience_points - 90) // 100) + 2
+                    xp_level = ((player.experience_points - 90) // 100) + 2
+                
+                # Get actual current level from student data
+                try:
+                    student_data = Student.objects.filter(user=player.user).first()
+                    actual_current_level = student_data.latestLevelId if student_data else 1
+                except:
+                    actual_current_level = 1
                 
                 leaderboard_data.append({
                     'rank': rank,
                     'user_id': player.user.userId,
                     'name': f"{player.user.firstName} {player.user.lastName}",
                     'experience_points': player.experience_points,
-                    'level': current_level
+                    'level': xp_level,  # XP-based level
+                    'current_level_id': actual_current_level  # Actual curriculum level
                 })
             
             print(f"🏆 [GetPVPLeaderboard] Sending leaderboard with {len(leaderboard_data)} players")
