@@ -5590,9 +5590,14 @@ class GetPvpAccuracyTrend(APIView):
             
             for i in range(7):
                 d = start_date + timedelta(days=i)
+                # Use a more robust date filtering approach
+                day_start = d
+                day_end = d + timedelta(days=1)
+                
                 day_pvp = PvPRoomResult.objects.filter(
                     player=user,
-                    created_at__date=d
+                    created_at__gte=day_start,
+                    created_at__lt=day_end
                 )
                 
                 if day_pvp.exists():
@@ -5668,15 +5673,26 @@ class GetPvpSpeedTrend(APIView):
             # Check total PvP records for this user
             total_pvp_records = PvPRoomResult.objects.filter(player=user).count()
             print(f"📊 PVP SPEED: User has {total_pvp_records} total PvP records")
+            
+            # Debug: Show all PvP records for this user
+            all_pvp_records = PvPRoomResult.objects.filter(player=user).order_by('-created_at')
+            print(f"📊 PVP SPEED: All PvP records for user {user.firstName}:")
+            for record in all_pvp_records[:5]:  # Show last 5 records
+                print(f"  - Room: {record.room.room_id}, Correct: {record.correct_answers}, Time: {record.total_time}s, Created: {record.created_at}")
 
             daily_speed = []
             labels = []
             
             for i in range(7):
                 d = start_date + timedelta(days=i)
+                # Use a more robust date filtering approach
+                day_start = d
+                day_end = d + timedelta(days=1)
+                
                 day_pvp = PvPRoomResult.objects.filter(
                     player=user,
-                    created_at__date=d
+                    created_at__gte=day_start,
+                    created_at__lt=day_end
                 )
                 
                 print(f"📅 PVP SPEED: Date {d} - Found {day_pvp.count()} PvP records")
@@ -5688,7 +5704,7 @@ class GetPvpSpeedTrend(APIView):
                     for result in day_pvp:
                         total_correct_answers += result.correct_answers  # Use correct answers for speed calculation
                         total_time_minutes += (result.total_time or 0) / 60
-                        print(f"  📊 PVP Record: Correct={result.correct_answers}, Time={result.total_time}s, Speed={result.speed_per_minute:.1f}")
+                        print(f"  📊 PVP Record: Correct={result.correct_answers}, Time={result.total_time}s, Speed={result.speed_per_minute:.1f}, Created={result.created_at}")
                     
                     speed = (total_correct_answers / total_time_minutes) if total_time_minutes > 0 else 0
                     print(f"  ⚡ Day Speed: {total_correct_answers} correct / {total_time_minutes:.1f} min = {speed:.1f} problems/min")
@@ -5708,12 +5724,16 @@ class GetPvpSpeedTrend(APIView):
             current_speed = daily_speed[-1] if daily_speed else 0
             weekly_progress = round(daily_speed[-1] - daily_speed[0], 1) if len(daily_speed) >= 2 else 0
 
-            return Response({
+            response_data = {
                 'currentSpeed': current_speed,
                 'weeklyProgress': weekly_progress,
                 'dailySpeed': daily_speed,
                 'labels': labels
-            }, status=status.HTTP_200_OK)
+            }
+            
+            print(f"📊 PVP SPEED RESPONSE: {response_data}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: f"Error getting PvP speed trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
