@@ -4484,10 +4484,24 @@ class SubmitPVPGameResult(APIView):
             try:
                 from .models import PvPRoomResult
                 accuracy_percentage = (correct_answers / room.number_of_questions * 100) if room.number_of_questions > 0 else 0
-                speed_per_minute = (correct_answers / (total_time / 60)) if total_time > 0 else 0  # Use correct_answers instead of total questions for actual speed
-                average_time_per_question = (total_time / room.number_of_questions) if room.number_of_questions > 0 else 0
+                
+                # Calculate speed from problemTimes if available, otherwise use total_time
+                if problem_times and len(problem_times) > 0:
+                    # Use actual time spent from problemTimes for accurate speed calculation
+                    total_actual_time = sum(problem.get('timeSpent', 0) for problem in problem_times)
+                    speed_per_minute = (correct_answers / (total_actual_time / 60)) if total_actual_time > 0 else 0
+                    average_time_per_question = total_actual_time / len(problem_times) if len(problem_times) > 0 else 0
+                    print(f"📈 PVP CALCULATIONS FROM PROBLEMTIMES: TotalActualTime={total_actual_time:.2f}s, Speed={speed_per_minute:.1f} problems/min")
+                else:
+                    # Fallback to total_time if problemTimes not available
+                    speed_per_minute = (correct_answers / (total_time / 60)) if total_time > 0 else 0
+                    average_time_per_question = (total_time / room.number_of_questions) if room.number_of_questions > 0 else 0
+                    print(f"📈 PVP CALCULATIONS FROM TOTALTIME: TotalTime={total_time}s, Speed={speed_per_minute:.1f} problems/min")
                 
                 print(f"📈 PVP CALCULATIONS: Accuracy={accuracy_percentage:.1f}%, Speed={speed_per_minute:.1f} problems/min, AvgTime={average_time_per_question:.1f}s")
+                
+                # Use actual time from problemTimes if available, otherwise use total_time
+                final_total_time = total_actual_time if problem_times and len(problem_times) > 0 else total_time
                 
                 # Create or update PvPRoomResult
                 pvp_result, created = PvPRoomResult.objects.get_or_create(
@@ -4496,7 +4510,7 @@ class SubmitPVPGameResult(APIView):
                     defaults={
                         'questions_answered': room.number_of_questions,
                         'correct_answers': correct_answers,
-                        'total_time': total_time,
+                        'total_time': final_total_time,
                         'average_time_per_question': average_time_per_question,
                         'accuracy_percentage': accuracy_percentage,
                         'speed_per_minute': speed_per_minute,
@@ -4510,7 +4524,7 @@ class SubmitPVPGameResult(APIView):
                     print(f"🔄 PVP RESULT UPDATE: Updating existing PvPRoomResult for room {room_id}")
                     pvp_result.questions_answered = room.number_of_questions
                     pvp_result.correct_answers = correct_answers
-                    pvp_result.total_time = total_time
+                    pvp_result.total_time = final_total_time
                     pvp_result.average_time_per_question = average_time_per_question
                     pvp_result.accuracy_percentage = accuracy_percentage
                     pvp_result.speed_per_minute = speed_per_minute
