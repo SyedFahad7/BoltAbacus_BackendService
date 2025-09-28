@@ -103,6 +103,8 @@ urlpatterns = [
     path('practiceSpeedTrend/', views.GetPracticeSpeedTrend.as_view()),
     path('pvpAccuracyTrend/', views.GetPvpAccuracyTrend.as_view()),
     path('pvpSpeedTrend/', views.GetPvpSpeedTrend.as_view()),
+    path('pvpQuestionsCompletedTrend/', views.GetPvpQuestionsCompletedTrend.as_view()),
+    path('pvpEfficiencyTrend/', views.GetPvpEfficiencyTrend.as_view()),
     
     # New progress components APIs
     path('getClassRank/', views.GetClassRank.as_view()),

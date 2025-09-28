@@ -4498,7 +4498,28 @@ class SubmitPVPGameResult(APIView):
                     average_time_per_question = (total_time / room.number_of_questions) if room.number_of_questions > 0 else 0
                     print(f"📈 PVP CALCULATIONS FROM TOTALTIME: TotalTime={total_time}s, Speed={speed_per_minute:.1f} problems/min")
                 
+                # For no-limit modes, calculate alternative metrics
+                if speed_per_minute == 0 or total_time == 0:
+                    print(f"📈 PVP NO-LIMIT MODE: Calculating alternative speed metrics")
+                    # Calculate questions per minute based on total game time (if available)
+                    if total_time > 0:
+                        speed_per_minute = (correct_answers / (total_time / 60))
+                        print(f"📈 PVP NO-LIMIT SPEED: {correct_answers} correct / {total_time/60:.2f} min = {speed_per_minute:.1f} problems/min")
+                    else:
+                        # If no time data, use a default calculation based on questions answered
+                        # Assume average 30 seconds per question for no-limit modes
+                        estimated_time = room.number_of_questions * 30  # 30 seconds per question
+                        speed_per_minute = (correct_answers / (estimated_time / 60))
+                        print(f"📈 PVP NO-LIMIT ESTIMATED: {correct_answers} correct / {estimated_time/60:.2f} min = {speed_per_minute:.1f} problems/min")
+                
                 print(f"📈 PVP CALCULATIONS: Accuracy={accuracy_percentage:.1f}%, Speed={speed_per_minute:.1f} problems/min, AvgTime={average_time_per_question:.1f}s")
+                
+                # Calculate additional metrics for all modes
+                questions_completed = correct_answers  # Questions answered correctly
+                efficiency_score = (correct_answers / room.number_of_questions * 100) if room.number_of_questions > 0 else 0  # Same as accuracy but different name
+                completion_rate = (correct_answers / room.number_of_questions * 100) if room.number_of_questions > 0 else 0
+                
+                print(f"📈 PVP ADDITIONAL METRICS: QuestionsCompleted={questions_completed}, EfficiencyScore={efficiency_score:.1f}%, CompletionRate={completion_rate:.1f}%")
                 
                 # Use actual time from problemTimes if available, otherwise use total_time
                 final_total_time = total_actual_time if problem_times and len(problem_times) > 0 else total_time
@@ -5774,6 +5795,187 @@ class GetPvpSpeedTrend(APIView):
 
         except Exception as e:
             return Response({Constants.JSON_MESSAGE: f"Error getting PvP speed trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPvpQuestionsCompletedTrend(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            print(f"📊 PVP QUESTIONS COMPLETED TREND REQUEST: {request.data}")
+            
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            from datetime import date, timedelta
+            from .models import PvPRoomResult, UserDetails
+
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                print(f"❌ PVP QUESTIONS: User not found for userId: {user_id}")
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            print(f"📊 PVP QUESTIONS: Getting trend for user {user.firstName} ({user_id})")
+            
+            end_date = date.today()
+            start_date = end_date - timedelta(days=6)
+            
+            print(f"📅 PVP QUESTIONS: Checking dates from {start_date} to {end_date}")
+            
+            daily_questions = []
+            labels = []
+            
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                day_start = d
+                day_end = d + timedelta(days=1)
+                
+                day_pvp = PvPRoomResult.objects.filter(
+                    player=user,
+                    created_at__gte=day_start,
+                    created_at__lt=day_end
+                )
+                
+                print(f"📅 PVP QUESTIONS: Date {d} - Found {day_pvp.count()} PvP records")
+                
+                if day_pvp.exists():
+                    total_questions = 0
+                    
+                    for result in day_pvp:
+                        total_questions += result.correct_answers  # Questions answered correctly
+                        print(f"  📊 PVP Record: QuestionsCompleted={result.correct_answers}, Created={result.created_at}")
+                    
+                    print(f"  📊 Day Questions: {total_questions} questions completed")
+                else:
+                    total_questions = 0
+                    print(f"  📊 Day Questions: No records = 0")
+                
+                daily_questions.append(total_questions)
+                
+                if i == 0:
+                    labels.append('6d ago')
+                elif i == 6:
+                    labels.append('Today')
+                else:
+                    labels.append(d.strftime('%a'))
+
+            current_questions = daily_questions[-1] if daily_questions else 0
+            weekly_progress = sum(daily_questions) if daily_questions else 0
+
+            response_data = {
+                'currentQuestions': current_questions,
+                'weeklyProgress': weekly_progress,
+                'dailyQuestions': daily_questions,
+                'labels': labels
+            }
+            
+            print(f"📊 PVP QUESTIONS RESPONSE: {response_data}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting PvP questions trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetPvpEfficiencyTrend(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            print(f"📊 PVP EFFICIENCY TREND REQUEST: {request.data}")
+            
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            from datetime import date, timedelta
+            from .models import PvPRoomResult, UserDetails
+
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                print(f"❌ PVP EFFICIENCY: User not found for userId: {user_id}")
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            print(f"📊 PVP EFFICIENCY: Getting trend for user {user.firstName} ({user_id})")
+            
+            end_date = date.today()
+            start_date = end_date - timedelta(days=6)
+            
+            print(f"📅 PVP EFFICIENCY: Checking dates from {start_date} to {end_date}")
+            
+            daily_efficiency = []
+            labels = []
+            
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                day_start = d
+                day_end = d + timedelta(days=1)
+                
+                day_pvp = PvPRoomResult.objects.filter(
+                    player=user,
+                    created_at__gte=day_start,
+                    created_at__lt=day_end
+                )
+                
+                print(f"📅 PVP EFFICIENCY: Date {d} - Found {day_pvp.count()} PvP records")
+                
+                if day_pvp.exists():
+                    total_correct = 0
+                    total_questions = 0
+                    
+                    for result in day_pvp:
+                        total_correct += result.correct_answers
+                        total_questions += result.questions_answered
+                        print(f"  📊 PVP Record: Correct={result.correct_answers}, Total={result.questions_answered}, Created={result.created_at}")
+                    
+                    efficiency = (total_correct / total_questions * 100) if total_questions > 0 else 0
+                    print(f"  📊 Day Efficiency: {total_correct} correct / {total_questions} total = {efficiency:.1f}%")
+                else:
+                    efficiency = 0
+                    print(f"  📊 Day Efficiency: No records = 0%")
+                
+                daily_efficiency.append(round(efficiency, 1))
+                
+                if i == 0:
+                    labels.append('6d ago')
+                elif i == 6:
+                    labels.append('Today')
+                else:
+                    labels.append(d.strftime('%a'))
+
+            current_efficiency = daily_efficiency[-1] if daily_efficiency else 0
+            weekly_progress = round(sum(daily_efficiency) / len(daily_efficiency), 1) if daily_efficiency else 0
+
+            response_data = {
+                'currentEfficiency': current_efficiency,
+                'weeklyProgress': weekly_progress,
+                'dailyEfficiency': daily_efficiency,
+                'labels': labels
+            }
+            
+            print(f"📊 PVP EFFICIENCY RESPONSE: {response_data}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"Error getting PvP efficiency trend: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GetClassRank(APIView):
