@@ -5713,15 +5713,24 @@ class GetPvpSpeedTrend(APIView):
                 if day_pvp.exists():
                     total_correct_answers = 0
                     total_time_minutes = 0
+                    total_speed_per_minute = 0
+                    record_count = 0
                     
                     for result in day_pvp:
                         total_correct_answers += result.correct_answers  # Use correct answers for speed calculation
                         total_time_minutes += (result.total_time or 0) / 60
+                        total_speed_per_minute += result.speed_per_minute or 0  # Use pre-calculated speed
+                        record_count += 1
                         print(f"  📊 PVP Record: Correct={result.correct_answers}, Time={result.total_time}s, Speed={result.speed_per_minute:.1f}, Created={result.created_at}")
                         print(f"  📊 PVP Record Debug: total_time={result.total_time}, total_time_minutes={total_time_minutes}, correct_answers={total_correct_answers}")
                     
-                    speed = (total_correct_answers / total_time_minutes) if total_time_minutes > 0 else 0
-                    print(f"  ⚡ Day Speed: {total_correct_answers} correct / {total_time_minutes:.1f} min = {speed:.1f} problems/min")
+                    # Use average of pre-calculated speeds if available, otherwise calculate
+                    if total_speed_per_minute > 0:
+                        speed = total_speed_per_minute / record_count
+                        print(f"  ⚡ Day Speed: Using pre-calculated average speed = {speed:.1f} problems/min")
+                    else:
+                        speed = (total_correct_answers / total_time_minutes) if total_time_minutes > 0 else 0
+                        print(f"  ⚡ Day Speed: Calculated speed = {total_correct_answers} correct / {total_time_minutes:.1f} min = {speed:.1f} problems/min")
                 else:
                     speed = 0
                     print(f"  ⚡ Day Speed: 0 (no PvP games)")
