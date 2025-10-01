@@ -1787,9 +1787,6 @@ class GetClassReport(APIView):
             levelId = data[Constants.LEVEL_ID]
             classId = data[Constants.CLASS_ID]
             topicId = data[Constants.TOPIC_ID]
-            if levelId == 1 and classId == 1:
-                return Response({Constants.JSON_MESSAGE: "This class doesn't have a quiz"},
-                                status=status.HTTP_404_NOT_FOUND)
             requestUserToken = request.headers[Constants.TOKEN_HEADER]
             try:
                 requestUserId = IdExtraction(requestUserToken)
@@ -1957,8 +1954,6 @@ def getStudentProgress(userId):
             classId = curriculum.classId
             topicId = curriculum.topicId
             counter = True
-            if classId == 1 and levelId == 1:
-                counter = False
             if counter:
                 try:
                     classProgress = levelsProgress[levelId]
