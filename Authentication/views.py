@@ -143,7 +143,7 @@ class CurrentLevelsV2(APIView):
             progress_dict = {p['quiz_id']: p['quizPass'] for p in user_progress}
             
             for level in range(1, latestLevel + 1):
-                latestClassId = 10
+                latestClassId = 12
                 topicCount = 0
                 numberOfTopicsPassed = 0
                 
@@ -198,7 +198,7 @@ class ClassProgress(APIView):
                 return Response({Constants.JSON_MESSAGE: "Level not accessible."}, status=status.HTTP_403_FORBIDDEN)
             elif latestLevel >= requestLevelId:
                 if requestLevelId < latestLevel:
-                    latestClass = 10
+                    latestClass = 12
                 finalTestPercentage = 0
                 oralTestPercentage = 0
                 finalTestTime = 0
@@ -2185,13 +2185,13 @@ def getNextClass(levelId, classId, tag_id):
     organizationsDetails = OrganizationTag.objects.filter(tagId=tag_id).first()
     maxLevelAllowed = organizationsDetails.maxLevel
     maxClassAllowed = organizationsDetails.maxClass
-    if classId > 10 or classId < 0:
+    if classId > 12 or classId < 0:
         return -2, -2
     if levelId > 10 or levelId < 0:
         return -3, -3
     if levelId > maxLevelAllowed or (levelId == maxLevelAllowed and classId >= maxClassAllowed):
         return -4, -4
-    if classId == 10:
+    if classId == 12:
         if levelId != 10:
             return levelId + 1, 1
         else:
