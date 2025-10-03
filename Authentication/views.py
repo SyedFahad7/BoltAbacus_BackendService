@@ -5488,19 +5488,29 @@ class GetPracticeAccuracyTrend(APIView):
                             except Exception:
                                 problem_times = None
 
+                        used_problem_times = False
+                        valid_correct_keys_found = False
+
                         if problem_times and isinstance(problem_times, list) and len(problem_times) > 0:
                             for problem_time in problem_times:
-                                # Skip invalid entries
                                 if not isinstance(problem_time, dict):
                                     continue
-                                # Optional: align with speed calc to ignore skipped
+                                used_problem_times = True
+                                if 'isCorrect' in problem_time:
+                                    valid_correct_keys_found = True
+                                # Align with speed calc to ignore skipped
                                 if problem_time.get('isSkipped', False):
                                     continue
                                 total_questions += 1
                                 if problem_time.get('isCorrect', False):
                                     total_correct += 1
-                        else:
-                            # Fallback to session-level aggregates
+
+                        # If problem_times were present but did not contain valid correctness info,
+                        # fall back to reliable aggregates for this session
+                        if used_problem_times and not valid_correct_keys_found:
+                            total_questions += getattr(session, 'numberOfQuestions', 0) or 0
+                            total_correct += getattr(session, 'score', 0) or 0
+                        elif not used_problem_times:
                             total_questions += getattr(session, 'numberOfQuestions', 0) or 0
                             total_correct += getattr(session, 'score', 0) or 0
 
