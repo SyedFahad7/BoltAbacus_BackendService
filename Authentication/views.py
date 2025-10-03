@@ -5472,17 +5472,43 @@ class GetPracticeAccuracyTrend(APIView):
                 if day_practice.exists():
                     total_questions = 0
                     total_correct = 0
+
+                    # DEBUG: emit per-day session summary
+                    try:
+                        print(f"[GetPracticeAccuracyTrend] date={d} sessions={day_practice.count()}")
+                    except Exception:
+                        pass
                     
                     for session in day_practice:
-                        if session.problemTimes and len(session.problemTimes) > 0:
-                            for problem_time in session.problemTimes:
+                        problem_times = getattr(session, 'problemTimes', None)
+                        # Ensure problem_times is a Python list (handle JSON/text storage)
+                        if isinstance(problem_times, str):
+                            try:
+                                problem_times = json.loads(problem_times)
+                            except Exception:
+                                problem_times = None
+
+                        if problem_times and isinstance(problem_times, list) and len(problem_times) > 0:
+                            for problem_time in problem_times:
+                                # Skip invalid entries
+                                if not isinstance(problem_time, dict):
+                                    continue
+                                # Optional: align with speed calc to ignore skipped
+                                if problem_time.get('isSkipped', False):
+                                    continue
                                 total_questions += 1
                                 if problem_time.get('isCorrect', False):
                                     total_correct += 1
                         else:
-                            total_questions += session.numberOfQuestions
-                            total_correct += session.score
-                    
+                            # Fallback to session-level aggregates
+                            total_questions += getattr(session, 'numberOfQuestions', 0) or 0
+                            total_correct += getattr(session, 'score', 0) or 0
+
+                    try:
+                        print(f"[GetPracticeAccuracyTrend] date={d} totals -> questions={total_questions}, correct={total_correct}")
+                    except Exception:
+                        pass
+
                     accuracy = (total_correct / total_questions * 100) if total_questions > 0 else 0
                 else:
                     accuracy = 0
