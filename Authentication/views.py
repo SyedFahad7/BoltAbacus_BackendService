@@ -5502,6 +5502,8 @@ class GetPracticeAccuracyTrend(APIView):
 
                         used_problem_times = False
                         valid_correct_values_found = False
+                        session_computed_questions = 0
+                        session_computed_correct = 0
 
                         if problem_times and isinstance(problem_times, list) and len(problem_times) > 0:
                             for problem_time in problem_times:
@@ -5529,18 +5531,39 @@ class GetPracticeAccuracyTrend(APIView):
                                 # Align with speed calc to ignore skipped
                                 if problem_time.get('isSkipped', False):
                                     continue
-                                total_questions += 1
+                                session_computed_questions += 1
                                 if is_correct_bool:
-                                    total_correct += 1
+                                    session_computed_correct += 1
 
-                        # If problem_times were present but did not contain valid correctness info,
-                        # fall back to reliable aggregates for this session
+                        # Decide whether to trust problem_times or fall back
+                        num_q = getattr(session, 'numberOfQuestions', 0) or 0
+                        score_val = getattr(session, 'score', 0) or 0
+
+                        fallback_to_aggregates = False
+                        # No valid correctness captured
                         if used_problem_times and not valid_correct_values_found:
-                            total_questions += getattr(session, 'numberOfQuestions', 0) or 0
-                            total_correct += getattr(session, 'score', 0) or 0
-                        elif not used_problem_times:
-                            total_questions += getattr(session, 'numberOfQuestions', 0) or 0
-                            total_correct += getattr(session, 'score', 0) or 0
+                            fallback_to_aggregates = True
+                        # If length mismatch or zero-correct but session score says otherwise
+                        if used_problem_times:
+                            if session_computed_questions != num_q:
+                                fallback_to_aggregates = True
+                            if session_computed_correct == 0 and score_val > 0:
+                                fallback_to_aggregates = True
+
+                        if used_problem_times and not fallback_to_aggregates:
+                            total_questions += session_computed_questions
+                            total_correct += session_computed_correct
+                            try:
+                                print(f"[GetPracticeAccuracyTrend][session-sum] id={getattr(session,'practiceQuestionId','n/a')} computedQ={session_computed_questions} computedCorrect={session_computed_correct}")
+                            except Exception:
+                                pass
+                        else:
+                            total_questions += num_q
+                            total_correct += score_val
+                            try:
+                                print(f"[GetPracticeAccuracyTrend][session-fallback] id={getattr(session,'practiceQuestionId','n/a')} numQ={num_q} score={score_val} usedPT={used_problem_times} validCorrect={valid_correct_values_found} ptQ={session_computed_questions} ptC={session_computed_correct}")
+                            except Exception:
+                                pass
 
                     try:
                         print(f"[GetPracticeAccuracyTrend] date={d} totals -> questions={total_questions}, correct={total_correct}")
