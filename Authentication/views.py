@@ -5481,6 +5481,18 @@ class GetPracticeAccuracyTrend(APIView):
                     
                     for session in day_practice:
                         problem_times = getattr(session, 'problemTimes', None)
+                        try:
+                            # Session-level debug
+                            pt_len = 0
+                            first_keys = []
+                            if isinstance(problem_times, list) and len(problem_times) > 0 and isinstance(problem_times[0], dict):
+                                pt_len = len(problem_times)
+                                first_keys = list(problem_times[0].keys())[:5]
+                            elif isinstance(problem_times, str):
+                                pt_len = len(problem_times)
+                            print(f"[GetPracticeAccuracyTrend][session] id={getattr(session, 'practiceQuestionId', 'n/a')} score={getattr(session, 'score', 'n/a')} numQ={getattr(session, 'numberOfQuestions', 'n/a')} ptType={type(problem_times).__name__} ptLen={pt_len} firstKeys={first_keys}")
+                        except Exception:
+                            pass
                         # Ensure problem_times is a Python list (handle JSON/text storage)
                         if isinstance(problem_times, str):
                             try:
@@ -5489,25 +5501,41 @@ class GetPracticeAccuracyTrend(APIView):
                                 problem_times = None
 
                         used_problem_times = False
-                        valid_correct_keys_found = False
+                        valid_correct_values_found = False
 
                         if problem_times and isinstance(problem_times, list) and len(problem_times) > 0:
                             for problem_time in problem_times:
                                 if not isinstance(problem_time, dict):
                                     continue
                                 used_problem_times = True
+                                # Normalize correctness from multiple possible keys/types
+                                raw_correct = None
                                 if 'isCorrect' in problem_time:
-                                    valid_correct_keys_found = True
+                                    raw_correct = problem_time.get('isCorrect')
+                                elif 'correct' in problem_time:
+                                    raw_correct = problem_time.get('correct')
+                                elif 'is_correct' in problem_time:
+                                    raw_correct = problem_time.get('is_correct')
+                                # Convert raw value to boolean
+                                is_correct_bool = False
+                                if isinstance(raw_correct, bool):
+                                    is_correct_bool = raw_correct
+                                elif isinstance(raw_correct, (int, float)):
+                                    is_correct_bool = raw_correct == 1
+                                elif isinstance(raw_correct, str):
+                                    is_correct_bool = raw_correct.lower() in ['true', '1', 'yes']
+                                if raw_correct is not None:
+                                    valid_correct_values_found = True
                                 # Align with speed calc to ignore skipped
                                 if problem_time.get('isSkipped', False):
                                     continue
                                 total_questions += 1
-                                if problem_time.get('isCorrect', False):
+                                if is_correct_bool:
                                     total_correct += 1
 
                         # If problem_times were present but did not contain valid correctness info,
                         # fall back to reliable aggregates for this session
-                        if used_problem_times and not valid_correct_keys_found:
+                        if used_problem_times and not valid_correct_values_found:
                             total_questions += getattr(session, 'numberOfQuestions', 0) or 0
                             total_correct += getattr(session, 'score', 0) or 0
                         elif not used_problem_times:
