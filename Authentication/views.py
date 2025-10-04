@@ -3789,8 +3789,11 @@ class GetUserTodoList(APIView):
             
             # Add personal goals from database
             from .models import PersonalGoal
+            print(f"🔍 [GetUserTodoList] Fetching personal goals for user: {user.userId}")
             personal_goals = PersonalGoal.objects.filter(user=user).order_by('-created_at')
+            print(f"🔍 [GetUserTodoList] Found {personal_goals.count()} personal goals")
             for goal in personal_goals:
+                print(f"🔍 [GetUserTodoList] Adding goal: {goal.title} (ID: {goal.id})")
                 todos.append({
                     'id': str(goal.id),
                     'title': goal.title,
@@ -3811,6 +3814,12 @@ class GetUserTodoList(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            # Log the actual error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"GetUserTodoList error for user {user_id if 'user_id' in locals() else 'unknown'}: {str(e)}")
+            print(f"❌ [GetUserTodoList] Exception: {str(e)}")
+            
             # return empty todos instead of 500 error to prevent retry loops
             return Response({
                 'success': True,
@@ -3906,6 +3915,8 @@ class AddPersonalGoal(APIView):
             # Create personal goal using PersonalGoal model
             from .models import PersonalGoal
             
+            print(f"🔍 [AddPersonalGoal] Creating goal for user: {user.userId}")
+            print(f"🔍 [AddPersonalGoal] Goal title: {goal_title}")
             personal_goal = PersonalGoal.objects.create(
                 user=user,
                 title=goal_title,
@@ -3919,6 +3930,7 @@ class AddPersonalGoal(APIView):
                 reminder_enabled=reminder_enabled,
                 reminder_time=parsed_reminder_time
             )
+            print(f"✅ [AddPersonalGoal] Goal created with ID: {personal_goal.id}")
             
             return Response({
                 'success': True,
