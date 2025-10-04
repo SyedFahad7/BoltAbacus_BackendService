@@ -3753,8 +3753,9 @@ class GetUserTodoList(APIView):
                 pass
             
             # Check if user has tried PVP
-            pvp_games = PVPGameResult.objects.filter(
-                models.Q(player1=user) | models.Q(player2=user)
+            from .models import PvPRoomResult
+            pvp_games = PvPRoomResult.objects.filter(
+                player=user
             ).count()
             if pvp_games == 0:
                 todos.append({
@@ -3793,28 +3794,33 @@ class GetUserTodoList(APIView):
             print(f"🔍 [GetUserTodoList] User object: {user}")
             print(f"🔍 [GetUserTodoList] User ID field: {user.userId}")
             
-            # Try different ways to query
-            personal_goals = PersonalGoal.objects.filter(user=user).order_by('-created_at')
-            print(f"🔍 [GetUserTodoList] Query 1 - Found {personal_goals.count()} personal goals")
-            
-            # Try querying by user ID directly
-            personal_goals_by_id = PersonalGoal.objects.filter(user__userId=user.userId).order_by('-created_at')
-            print(f"🔍 [GetUserTodoList] Query 2 - Found {personal_goals_by_id.count()} personal goals by user ID")
-            
-            # Use the query that works
-            goals_to_use = personal_goals if personal_goals.exists() else personal_goals_by_id
-            print(f"🔍 [GetUserTodoList] Using query with {goals_to_use.count()} goals")
-            
-            for goal in goals_to_use:
-                print(f"🔍 [GetUserTodoList] Adding goal: {goal.title} (ID: {goal.id})")
-                todos.append({
-                    'id': str(goal.id),
-                    'title': goal.title,
-                    'description': goal.description or '',
-                    'completed': goal.completed,
-                    'priority': goal.priority,
-                    'type': goal.goal_type
-                })
+            try:
+                # Try different ways to query
+                personal_goals = PersonalGoal.objects.filter(user=user).order_by('-created_at')
+                print(f"🔍 [GetUserTodoList] Query 1 - Found {personal_goals.count()} personal goals")
+                
+                # Try querying by user ID directly
+                personal_goals_by_id = PersonalGoal.objects.filter(user__userId=user.userId).order_by('-created_at')
+                print(f"🔍 [GetUserTodoList] Query 2 - Found {personal_goals_by_id.count()} personal goals by user ID")
+                
+                # Use the query that works
+                goals_to_use = personal_goals if personal_goals.exists() else personal_goals_by_id
+                print(f"🔍 [GetUserTodoList] Using query with {goals_to_use.count()} goals")
+                
+                for goal in goals_to_use:
+                    print(f"🔍 [GetUserTodoList] Adding goal: {goal.title} (ID: {goal.id})")
+                    todos.append({
+                        'id': str(goal.id),
+                        'title': goal.title,
+                        'description': goal.description or '',
+                        'completed': goal.completed,
+                        'priority': goal.priority,
+                        'type': goal.goal_type
+                    })
+            except Exception as e:
+                print(f"❌ [GetUserTodoList] Error fetching personal goals: {e}")
+                import traceback
+                print(f"❌ [GetUserTodoList] Traceback: {traceback.format_exc()}")
             
             return Response({
                 'success': True,
