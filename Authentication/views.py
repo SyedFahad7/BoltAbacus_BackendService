@@ -4037,10 +4037,13 @@ class TogglePersonalGoal(APIView):
 
     def post(self, request):
         try:
+            print(f"🔍 [TogglePersonalGoal] Request received: {request.data}")
+            
             # Extract token from headers
             auth_token = request.headers.get(Constants.TOKEN_HEADER)
             
             if not auth_token:
+                print("❌ [TogglePersonalGoal] No auth token")
                 return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
@@ -4048,27 +4051,36 @@ class TogglePersonalGoal(APIView):
             try:
                 payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
                 user_id = payload[Constants.USER_ID]
+                print(f"🔍 [TogglePersonalGoal] User ID from token: {user_id}")
             except jwt.ExpiredSignatureError:
+                print("❌ [TogglePersonalGoal] Token expired")
                 return Response({Constants.JSON_MESSAGE: "Token expired"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             except jwt.InvalidTokenError:
+                print("❌ [TogglePersonalGoal] Invalid token")
                 return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
                               status=status.HTTP_401_UNAUTHORIZED)
             
             user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
+                print(f"❌ [TogglePersonalGoal] User not found: {user_id}")
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
             
             # Get goal ID from request
             goal_id = request.data.get('goal_id', '').strip()
+            print(f"🔍 [TogglePersonalGoal] Goal ID: {goal_id}")
             if not goal_id:
+                print("❌ [TogglePersonalGoal] No goal ID provided")
                 return Response({Constants.JSON_MESSAGE: "Goal ID is required"}, 
                               status=status.HTTP_400_BAD_REQUEST)
             
             # Find and toggle the goal completion status
             from .models import PersonalGoal
             try:
+                print(f"🔍 [TogglePersonalGoal] Looking for goal {goal_id} for user {user.userId}")
                 goal = PersonalGoal.objects.get(id=goal_id, user=user)
+                print(f"🔍 [TogglePersonalGoal] Found goal: {goal.title}, current completed: {goal.completed}")
+                
                 goal.completed = not goal.completed
                 goal.save()
                 
@@ -4083,10 +4095,20 @@ class TogglePersonalGoal(APIView):
                     }
                 }, status=status.HTTP_200_OK)
             except PersonalGoal.DoesNotExist:
+                print(f"❌ [TogglePersonalGoal] Goal not found: {goal_id}")
                 return Response({Constants.JSON_MESSAGE: "Goal not found"}, 
                               status=status.HTTP_404_NOT_FOUND)
+            except Exception as e:
+                print(f"❌ [TogglePersonalGoal] Error updating goal: {e}")
+                import traceback
+                print(f"❌ [TogglePersonalGoal] Traceback: {traceback.format_exc()}")
+                return Response({Constants.JSON_MESSAGE: f"Error updating goal: {str(e)}"}, 
+                              status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         except Exception as e:
+            print(f"❌ [TogglePersonalGoal] General error: {e}")
+            import traceback
+            print(f"❌ [TogglePersonalGoal] General traceback: {traceback.format_exc()}")
             return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
