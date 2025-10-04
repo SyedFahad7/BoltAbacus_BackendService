@@ -3790,9 +3790,22 @@ class GetUserTodoList(APIView):
             # Add personal goals from database
             from .models import PersonalGoal
             print(f"🔍 [GetUserTodoList] Fetching personal goals for user: {user.userId}")
+            print(f"🔍 [GetUserTodoList] User object: {user}")
+            print(f"🔍 [GetUserTodoList] User ID field: {user.userId}")
+            
+            # Try different ways to query
             personal_goals = PersonalGoal.objects.filter(user=user).order_by('-created_at')
-            print(f"🔍 [GetUserTodoList] Found {personal_goals.count()} personal goals")
-            for goal in personal_goals:
+            print(f"🔍 [GetUserTodoList] Query 1 - Found {personal_goals.count()} personal goals")
+            
+            # Try querying by user ID directly
+            personal_goals_by_id = PersonalGoal.objects.filter(user__userId=user.userId).order_by('-created_at')
+            print(f"🔍 [GetUserTodoList] Query 2 - Found {personal_goals_by_id.count()} personal goals by user ID")
+            
+            # Use the query that works
+            goals_to_use = personal_goals if personal_goals.exists() else personal_goals_by_id
+            print(f"🔍 [GetUserTodoList] Using query with {goals_to_use.count()} goals")
+            
+            for goal in goals_to_use:
                 print(f"🔍 [GetUserTodoList] Adding goal: {goal.title} (ID: {goal.id})")
                 todos.append({
                     'id': str(goal.id),
@@ -4007,6 +4020,64 @@ class RemovePersonalGoal(APIView):
                 }, status=status.HTTP_200_OK)
             except PersonalGoal.DoesNotExist:
                 return Response({Constants.JSON_MESSAGE: "Personal goal not found"}, 
+                              status=status.HTTP_404_NOT_FOUND)
+            
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: repr(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TogglePersonalGoal(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Extract token from headers
+            auth_token = request.headers.get(Constants.TOKEN_HEADER)
+            
+            if not auth_token:
+                return Response({Constants.JSON_MESSAGE: "Authentication token required"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Decode token to get user
+            try:
+                payload = jwt.decode(auth_token, Constants.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload[Constants.USER_ID]
+            except jwt.ExpiredSignatureError:
+                return Response({Constants.JSON_MESSAGE: "Token expired"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({Constants.JSON_MESSAGE: "Invalid token"}, 
+                              status=status.HTTP_401_UNAUTHORIZED)
+            
+            user = UserDetails.objects.filter(userId=user_id).first()
+            if user is None:
+                return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get goal ID from request
+            goal_id = request.data.get('goal_id', '').strip()
+            if not goal_id:
+                return Response({Constants.JSON_MESSAGE: "Goal ID is required"}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find and toggle the goal completion status
+            from .models import PersonalGoal
+            try:
+                goal = PersonalGoal.objects.get(id=goal_id, user=user)
+                goal.completed = not goal.completed
+                goal.save()
+                
+                print(f"✅ [TogglePersonalGoal] Goal {goal_id} completion toggled to {goal.completed}")
+                
+                return Response({
+                    'success': True,
+                    'message': 'Personal goal completion status updated successfully',
+                    'data': {
+                        'id': str(goal.id),
+                        'completed': goal.completed
+                    }
+                }, status=status.HTTP_200_OK)
+            except PersonalGoal.DoesNotExist:
+                return Response({Constants.JSON_MESSAGE: "Goal not found"}, 
                               status=status.HTTP_404_NOT_FOUND)
             
         except Exception as e:
