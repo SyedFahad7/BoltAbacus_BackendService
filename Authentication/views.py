@@ -178,7 +178,7 @@ class ClassProgress(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        # Initialize todos list to collect user's goals (define at top for linter scope)
+        # Initialize todos list to collect user's goals
         todos = []
         try:
             requestUserToken = request.headers[Constants.TOKEN_HEADER]
@@ -3688,6 +3688,9 @@ class GetUserTodoList(APIView):
             user = UserDetails.objects.filter(userId=user_id).first()
             if user is None:
                 return Response({Constants.JSON_MESSAGE: "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # todos list before any usage
+            todos = []
             
             # Add personal goals from database
             from .models import PersonalGoal
