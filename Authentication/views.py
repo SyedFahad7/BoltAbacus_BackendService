@@ -178,6 +178,8 @@ class ClassProgress(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Initialize todos list to collect user's goals (define at top for linter scope)
+        todos = []
         try:
             requestUserToken = request.headers[Constants.TOKEN_HEADER]
             data = request.data
@@ -239,6 +241,7 @@ class TopicsData(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        todos = []
         try:
             data = request.data
             requestLevelId = data[Constants.LEVEL_ID]
