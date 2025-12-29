@@ -1,0 +1,29 @@
+# Ignore Python cache and environment files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+
+# Git and VCS
+.git/
+.gitignore
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Node/Frontend artifacts (if any)
+node_modules/
+build/
+dist/
+
+# Docker files that shouldn't copy into image context
+Dockerfile*
+docker-compose*
+
+# OS files
+.DS_Store
+Thumbs.db

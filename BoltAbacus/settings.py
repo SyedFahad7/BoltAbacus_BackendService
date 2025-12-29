@@ -86,7 +86,7 @@ DATABASES = {
         'NAME': 'postgres',
         'USER': 'postgres',
         'PASSWORD': 'Bolt@123',
-        'HOST': '34.14.176.43',  # Public IP of your Cloud SQL instance
+        'HOST': '34.14.145.30',  # Public IP of your Cloud SQL instance
         'PORT': '5432',
     }
 }
