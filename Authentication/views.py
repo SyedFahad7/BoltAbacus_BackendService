@@ -85,7 +85,7 @@ class SignIn(APIView):
                 )
 
             payload = {
-                Constants.USER_ID: user.user_id,
+                Constants.USER_ID: user.userId,
                 Constants.ROLE: user.role,
                 Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
                 "creationTime": str(datetime.datetime.utcnow()),
@@ -95,7 +95,7 @@ class SignIn(APIView):
             token = jwt.encode(payload, Constants.SECRET_KEY, algorithm="HS256")
 
             return Response({
-                "userId": user.user_id,
+                "userId": user.userId,
                 Constants.EMAIL: user.email,
                 Constants.ROLE: user.role,
                 Constants.FIRST_NAME: user.first_name,
