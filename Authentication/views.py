@@ -98,8 +98,8 @@ class SignIn(APIView):
                 "userId": user.userId,
                 Constants.EMAIL: user.email,
                 Constants.ROLE: user.role,
-                Constants.FIRST_NAME: user.first_name,
-                Constants.LAST_NAME: user.last_name,
+                Constants.FIRST_NAME: user.firstName,
+                Constants.LAST_NAME: user.lastName,
                 "phone": user.phone_number,
                 Constants.ORGANIZATION_NAME: organization.organizationName,
                 "token": token
