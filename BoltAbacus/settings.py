@@ -86,10 +86,16 @@ DATABASES = {
         'NAME': 'postgres',
         'USER': 'postgres',
         'PASSWORD': 'Bolt@123',
-        'HOST': '34.14.145.30',  # Public IP of your Cloud SQL instance
+        'HOST': '34.14.145.30',
         'PORT': '5432',
+        'CONN_MAX_AGE': 60,          # keep connections alive
+        'OPTIONS': {
+            'sslmode': 'require',    # REQUIRED for Cloud SQL
+            'connect_timeout': 5,    # prevent long hangs
+        },
     }
 }
+
 
 # ==========================================
 
