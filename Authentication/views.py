@@ -101,10 +101,13 @@ class SignIn(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response(
-                {Constants.JSON_MESSAGE: "Internal server error"},
+                {Constants.JSON_MESSAGE: f"Internal server error: {repr(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 
 
