@@ -58,7 +58,7 @@ class SignIn(APIView):
                 )
 
             # ⚠️ Plain-text check (security issue, but keeping consistent for now)
-            if password != user.encrypted_password:
+            if password != user.encryptedPassword:
                 return Response(
                     {Constants.JSON_MESSAGE: "Invalid Password. Try Again"},
                     status=status.HTTP_401_UNAUTHORIZED
