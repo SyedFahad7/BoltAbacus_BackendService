@@ -42,10 +42,8 @@ class SignIn(APIView):
 
             email = email.lower().strip()
 
-            # ✅ SINGLE user fetch
-            user = UserDetails.objects.select_related(
-                'organization'
-            ).filter(email=email).first()
+            # ✅ Fetch user (single query)
+            user = UserDetails.objects.filter(email=email).first()
 
             if not user:
                 return Response(
@@ -59,14 +57,21 @@ class SignIn(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-            # ⚠️ SECURITY NOTE: this should be Django check_password
+            # ⚠️ Plain-text check (security issue, but keeping consistent for now)
             if password != user.encrypted_password:
                 return Response(
                     {Constants.JSON_MESSAGE: "Invalid Password. Try Again"},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            organization = user.organization
+            tag_id = user.tag_id
+            if not tag_id:
+                return Response(
+                    {Constants.JSON_MESSAGE: "User organization not found. Please contact the administrator"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            organization = OrganizationTag.objects.filter(tagId=tag_id).first()
             if not organization:
                 return Response(
                     {Constants.JSON_MESSAGE: "Organization not found. Please contact the administrator"},
@@ -87,7 +92,7 @@ class SignIn(APIView):
                 Constants.ORGANIZATION_EXPIRATION_DATE: str(organization.expirationDate),
             }
 
-            loginToken = jwt.encode(payload, Constants.SECRET_KEY, algorithm='HS256')
+            token = jwt.encode(payload, Constants.SECRET_KEY, algorithm="HS256")
 
             return Response({
                 "userId": user.user_id,
@@ -97,16 +102,16 @@ class SignIn(APIView):
                 Constants.LAST_NAME: user.last_name,
                 "phone": user.phone_number,
                 Constants.ORGANIZATION_NAME: organization.organizationName,
-                "token": loginToken
+                "token": token
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            # TEMP: keep visible until verified
             return Response(
-                {Constants.JSON_MESSAGE: f"Internal server error: {repr(e)}"},
+                {Constants.JSON_MESSAGE: f"Internal server error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 
 
