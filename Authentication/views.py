@@ -96,11 +96,11 @@ class SignIn(APIView):
 
             return Response({
                 "userId": user.userId,
-                Constants.EMAIL: user.email,
-                Constants.ROLE: user.role,
-                Constants.FIRST_NAME: user.firstName,
-                Constants.LAST_NAME: user.lastName,
-                "phone": user.phone_number,
+                "email": user.email,
+                "role": user.role,
+                "firstName": user.firstName,
+                "lastName": user.lastName,
+                "phone": user.phoneNumber,
                 Constants.ORGANIZATION_NAME: organization.organizationName,
                 "token": token
             }, status=status.HTTP_200_OK)
