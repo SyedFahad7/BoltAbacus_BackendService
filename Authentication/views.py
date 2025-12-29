@@ -29,51 +29,83 @@ class SignIn(APIView):
     permission_classes = (AllowAny,)
 
     def post(self, request):
-        data = self.request.data
-        email = data[Constants.EMAIL]
-        email = email.lower()
-        password = data[Constants.PASSWORD]
-        user = UserDetails.objects.filter(email=email).values()
-        if user.exists():
+        try:
+            data = self.request.data
+            email = data.get(Constants.EMAIL)
+            password = data.get(Constants.PASSWORD)
+            
+            if not email or not password:
+                return Response({Constants.JSON_MESSAGE: "Email and password are required"}, 
+                                status=status.HTTP_400_BAD_REQUEST)
+            
+            email = email.lower()
+            user = UserDetails.objects.filter(email=email).values()
+            
+            if not user.exists():
+                return Response({Constants.JSON_MESSAGE: "Invalid Credentials. Try Again"},
+                                status=status.HTTP_401_UNAUTHORIZED)
+            
             user = user.first()
+            
             if user[Constants.BLOCKED] == True:
-                return Response({Constants.JSON_MESSAGE: "The user has been deactivated, Please contact the administrator"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({Constants.JSON_MESSAGE: "The user has been deactivated, Please contact the administrator"}, 
+                                status=status.HTTP_403_FORBIDDEN)
+            
             user_password = user[Constants.ENCRYPTED_PASSWORD]
-            if password == user_password:
-                organization = OrganizationTag.objects.filter(tagId=user["tag_id"]).first()
-                organizationExpirationDate = organization.expirationDate
-                if organizationExpirationDate < datetime.date.today():
-                    return Response({Constants.JSON_MESSAGE: "The subscription has expired. Please contact the "
-                                                             "administrator to renew it."},
-                                    status=status.HTTP_403_FORBIDDEN)
-                payload = {
-                    Constants.USER_ID: user[Constants.USER_ID],
-                    Constants.ROLE: user[Constants.ROLE],
-                    Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
-                    "creationTime": str(datetime.datetime.utcnow()),
-                    Constants.ORGANIZATION_EXPIRATION_DATE: str(organizationExpirationDate)
-                }
-                secretKey = Constants.SECRET_KEY
-                loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
-                response = Response({
-                    "userId": user[Constants.USER_ID],
-                    Constants.EMAIL: user[Constants.EMAIL],
-                    Constants.ROLE: user[Constants.ROLE],
-                    Constants.FIRST_NAME: user[Constants.FIRST_NAME],
-                    Constants.LAST_NAME: user[Constants.LAST_NAME],
-                    "phone": user[Constants.PHONE_NUMBER],
-                    Constants.ORGANIZATION_NAME: organization.organizationName,
-                    "token": loginToken
-                },
-                    status=status.HTTP_200_OK
-                )
-                return response
-            else:
+            
+            if password != user_password:
                 return Response({Constants.JSON_MESSAGE: "Invalid Password. Try Again"},
                                 status=status.HTTP_401_UNAUTHORIZED)
-        else:
-            return Response({Constants.JSON_MESSAGE: "Invalid Credentials. Try Again"},
-                            status=status.HTTP_401_UNAUTHORIZED)
+            
+            tag_id = user.get("tag_id")
+            
+            if not tag_id:
+                return Response({Constants.JSON_MESSAGE: "User organization not found. Please contact the administrator"}, 
+                                status=status.HTTP_403_FORBIDDEN)
+            
+            organization = OrganizationTag.objects.filter(tagId=tag_id).first()
+            
+            if not organization:
+                return Response({Constants.JSON_MESSAGE: "Organization not found. Please contact the administrator"}, 
+                                status=status.HTTP_403_FORBIDDEN)
+            
+            organizationExpirationDate = organization.expirationDate
+            
+            if organizationExpirationDate < datetime.date.today():
+                return Response({Constants.JSON_MESSAGE: "The subscription has expired. Please contact the "
+                                                         "administrator to renew it."},
+                                status=status.HTTP_403_FORBIDDEN)
+            
+            payload = {
+                Constants.USER_ID: user[Constants.USER_ID],
+                Constants.ROLE: user[Constants.ROLE],
+                Constants.EXPIRY_TIME: str(datetime.datetime.utcnow() + datetime.timedelta(minutes=60)),
+                "creationTime": str(datetime.datetime.utcnow()),
+                Constants.ORGANIZATION_EXPIRATION_DATE: str(organizationExpirationDate)
+            }
+            
+            secretKey = Constants.SECRET_KEY
+            loginToken = jwt.encode(payload, secretKey, algorithm='HS256')
+            
+            response = Response({
+                "userId": user[Constants.USER_ID],
+                Constants.EMAIL: user[Constants.EMAIL],
+                Constants.ROLE: user[Constants.ROLE],
+                Constants.FIRST_NAME: user[Constants.FIRST_NAME],
+                Constants.LAST_NAME: user[Constants.LAST_NAME],
+                "phone": user[Constants.PHONE_NUMBER],
+                Constants.ORGANIZATION_NAME: organization.organizationName,
+                "token": loginToken
+            }, status=status.HTTP_200_OK)
+            
+            return response
+            
+        except KeyError as e:
+            return Response({Constants.JSON_MESSAGE: f"Missing required field: {str(e)}"}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({Constants.JSON_MESSAGE: f"An error occurred: {str(e)}"}, 
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CurrentLevels(APIView):
